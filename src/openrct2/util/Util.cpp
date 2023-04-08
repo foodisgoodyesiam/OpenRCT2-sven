@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2022 OpenRCT2 developers
+ * Copyright (c) 2014-2023 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -24,8 +24,6 @@
 #include <ctime>
 #include <random>
 
-
-
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #    include <cpuid.h>
 #    define OpenRCT2_CPUID_GNUC_X86
@@ -36,7 +34,7 @@
 #endif
 
 #ifdef OPENRCT2_X86
-static bool cpuid_x86(uint32_t* cpuid_outdata, int32_t eax)
+static bool CPUIDX86(uint32_t* cpuid_outdata, int32_t eax)
 {
 #    if defined(OpenRCT2_CPUID_GNUC_X86)
     int ret = __get_cpuid(eax, &cpuid_outdata[0], &cpuid_outdata[1], &cpuid_outdata[2], &cpuid_outdata[3]);
@@ -50,12 +48,12 @@ static bool cpuid_x86(uint32_t* cpuid_outdata, int32_t eax)
 }
 #endif // OPENRCT2_X86
 
-bool sse41_available()
+bool SSE41Available()
 {
 #ifdef OPENRCT2_X86
     // SSE4.1 support is declared as the 19th bit of ECX with CPUID(EAX = 1).
     uint32_t regs[4] = { 0 };
-    if (cpuid_x86(regs, 1))
+    if (CPUIDX86(regs, 1))
     {
         return (regs[2] & (1 << 19));
     }
@@ -63,7 +61,7 @@ bool sse41_available()
     return false;
 }
 
-bool avx2_available()
+bool AVX2Available()
 {
 #ifdef OPENRCT2_X86
     // For GCC and similar use the builtin function, as cpuid changed its semantics in
@@ -75,7 +73,7 @@ bool avx2_available()
 #    else
     // AVX2 support is declared as the 5th bit of EBX with CPUID(EAX = 7, ECX = 0).
     uint32_t regs[4] = { 0 };
-    if (cpuid_x86(regs, 7))
+    if (CPUIDX86(regs, 7))
     {
         bool avxCPUSupport = (regs[1] & (1 << 5)) != 0;
         if (avxCPUSupport)
@@ -92,12 +90,12 @@ bool avx2_available()
     return false;
 }
 
-/*static bool bitcount_popcnt_available()
+/*static bool BitCountPopcntAvailable()
 {
 #ifdef OPENRCT2_X86
     // POPCNT support is declared as the 23rd bit of ECX with CPUID(EAX = 1).
     uint32_t regs[4] = { 0 };
-    if (cpuid_x86(regs, 1))
+    if (CPUIDX86(regs, 1))
     {
         return (regs[2] & (1 << 23));
     }
@@ -105,7 +103,7 @@ bool avx2_available()
     return false;
 }*/
 
-/*static int32_t bitcount_popcnt(uint32_t source)
+/*static int32_t BitCountPopcnt(uint32_t source)
 {
 // Use CPUID defines to figure out calling style
 #if defined(OpenRCT2_CPUID_GNUC_X86)
@@ -122,7 +120,7 @@ bool avx2_available()
 #endif
 }*/
 
-/*static int32_t bitcount_lut(uint32_t source)
+/*static int32_t BitCountLut(uint32_t source)
 {
     // https://graphics.stanford.edu/~seander/bithacks.html
     static constexpr const uint8_t BitsSetTable256[256] = {
@@ -135,29 +133,18 @@ bool avx2_available()
         + BitsSetTable256[source >> 24];
 }*/
 
-//static int32_t (*bitcount_fn)(uint32_t);
+//static int32_t (*BitCountFn)(uint32_t);
 
-void bitcount_init()
+void BitCountInit()
 {
     return;
-    //bitcount_fn = bitcount_popcnt_available() ? bitcount_popcnt : bitcount_lut;
+    //BitCountFn = BitCountPopcntAvailable() ? BitCountPopcnt : BitCountLut;
 }
 
-/*int32_t bitcount(uint32_t source)
+/*int32_t BitCount(uint32_t source)
 {
-    return bitcount_fn(source);
+    return BitCountFn(source);
 }*/
-
-/* case insensitive compare */
-int32_t strcicmp(char const* a, char const* b)
-{
-    for (;; a++, b++)
-    {
-        int32_t d = tolower(static_cast<unsigned char>(*a)) - tolower(static_cast<unsigned char>(*b));
-        if (d != 0 || !*a)
-            return d;
-    }
-}
 
 /* Case insensitive logical compare */
 // Example:
@@ -166,7 +153,7 @@ int32_t strcicmp(char const* a, char const* b)
 // - Guest 100
 // - John v2.0
 // - John v2.1
-int32_t strlogicalcmp(const char* s1, const char* s2)
+int32_t StrLogicalCmp(const char* s1, const char* s2)
 {
     for (;;)
     {
@@ -198,33 +185,7 @@ int32_t strlogicalcmp(const char* s1, const char* s2)
     }
 }
 
-utf8* safe_strtrunc(utf8* text, size_t size)
-{
-    assert(text != nullptr);
-
-    if (size == 0)
-        return text;
-
-    const char* sourceLimit = text + size - 1;
-    char* ch = text;
-    char* last = text;
-    while (utf8_get_next(ch, const_cast<const utf8**>(&ch)) != 0)
-    {
-        if (ch <= sourceLimit)
-        {
-            last = ch;
-        }
-        else
-        {
-            break;
-        }
-    }
-    *last = 0;
-
-    return text;
-}
-
-char* safe_strcpy(char* destination, const char* source, size_t size)
+char* SafeStrCpy(char* destination, const char* source, size_t size)
 {
     assert(destination != nullptr);
     assert(source != nullptr);
@@ -238,11 +199,11 @@ char* safe_strcpy(char* destination, const char* source, size_t size)
     const char* sourceLimit = source + size - 1;
     const char* ch = source;
     uint32_t codepoint;
-    while ((codepoint = utf8_get_next(ch, &ch)) != 0)
+    while ((codepoint = UTF8GetNext(ch, &ch)) != 0)
     {
         if (ch <= sourceLimit)
         {
-            destination = utf8_write_codepoint(destination, codepoint);
+            destination = UTF8WriteCodepoint(destination, codepoint);
         }
         else
         {
@@ -253,12 +214,12 @@ char* safe_strcpy(char* destination, const char* source, size_t size)
 
     if (truncated)
     {
-        log_warning("Truncating string \"%s\" to %d bytes.", result, size);
+        LOG_WARNING("Truncating string \"%s\" to %d bytes.", result, size);
     }
     return result;
 }
 
-char* safe_strcat(char* destination, const char* source, size_t size)
+char* SafeStrCat(char* destination, const char* source, size_t size)
 {
     assert(destination != nullptr);
     assert(source != nullptr);
@@ -299,57 +260,13 @@ char* safe_strcat(char* destination, const char* source, size_t size)
     if (!terminated)
     {
         result[size - 1] = '\0';
-        log_warning("Truncating string \"%s\" to %d bytes.", result, size);
+        LOG_WARNING("Truncating string \"%s\" to %d bytes.", result, size);
     }
 
     return result;
 }
 
-#if defined(_WIN32)
-char* strcasestr(const char* haystack, const char* needle)
-{
-    const char* p1 = haystack;
-    const char* p2 = needle;
-    const char* r = *p2 == 0 ? haystack : nullptr;
-
-    while (*p1 != 0 && *p2 != 0)
-    {
-        if (tolower(static_cast<unsigned char>(*p1)) == tolower(static_cast<unsigned char>(*p2)))
-        {
-            if (r == nullptr)
-                r = p1;
-            p2++;
-        }
-        else
-        {
-            p2 = needle;
-            if (r != nullptr)
-                p1 = r + 1;
-
-            if (tolower(static_cast<unsigned char>(*p1)) == tolower(static_cast<unsigned char>(*p2)))
-            {
-                r = p1;
-                p2++;
-            }
-            else
-            {
-                r = nullptr;
-            }
-        }
-
-        p1++;
-    }
-
-    return *p2 == 0 ? const_cast<char*>(r) : nullptr;
-}
-#endif
-
-bool str_is_null_or_empty(const char* str)
-{
-    return str == nullptr || str[0] == 0;
-}
-
-uint32_t util_rand()
+uint32_t UtilRand()
 {
     thread_local std::mt19937 _prng(std::random_device{}());
     return _prng();
@@ -357,7 +274,7 @@ uint32_t util_rand()
 
 // Returns a random floating point number from the Standard Normal Distribution; mean of 0 and standard deviation of 1.
 // TODO: In C++20 this can be templated, where the standard deviation is passed as a value template argument.
-float util_rand_normal_distributed()
+float UtilRandNormalDistributed()
 {
     thread_local std::mt19937 _prng{ std::random_device{}() };
     thread_local std::normal_distribution<float> _distributor{ 0.0f, 1.0f };
@@ -368,7 +285,7 @@ constexpr size_t CHUNK = 128 * 1024;
 
 // Compress the source to gzip-compatible stream, write to dest.
 // Mainly used for compressing the crashdumps
-bool util_gzip_compress(FILE* source, FILE* dest)
+bool UtilGzipCompress(FILE* source, FILE* dest)
 {
     if (source == nullptr || dest == nullptr)
     {
@@ -387,7 +304,7 @@ bool util_gzip_compress(FILE* source, FILE* dest)
     ret = deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, windowBits | GZIP_ENCODING, 8, Z_DEFAULT_STRATEGY);
     if (ret != Z_OK)
     {
-        log_error("Failed to initialise stream");
+        LOG_ERROR("Failed to initialise stream");
         return false;
     }
     do
@@ -396,7 +313,7 @@ bool util_gzip_compress(FILE* source, FILE* dest)
         if (ferror(source))
         {
             deflateEnd(&strm);
-            log_error("Failed to read data from source");
+            LOG_ERROR("Failed to read data from source");
             return false;
         }
         flush = feof(source) ? Z_FINISH : Z_NO_FLUSH;
@@ -408,14 +325,14 @@ bool util_gzip_compress(FILE* source, FILE* dest)
             ret = deflate(&strm, flush);
             if (ret == Z_STREAM_ERROR)
             {
-                log_error("Failed to compress data");
+                LOG_ERROR("Failed to compress data");
                 return false;
             }
             have = CHUNK - strm.avail_out;
             if (fwrite(out, 1, have, dest) != have || ferror(dest))
             {
                 deflateEnd(&strm);
-                log_error("Failed to write data to destination");
+                LOG_ERROR("Failed to write data to destination");
                 return false;
             }
         } while (strm.avail_out == 0);
@@ -521,7 +438,7 @@ std::vector<uint8_t> Ungzip(const void* data, const size_t dataLen)
 }
 
 // Type-independent code left as macro to reduce duplicate code.
-#define add_clamp_body(value, value_to_add, min_cap, max_cap)                                                                  \
+#define ADD_CLAMP_BODY(value, value_to_add, min_cap, max_cap)                                                                  \
     if ((value_to_add > 0) && (value > (max_cap - (value_to_add))))                                                            \
     {                                                                                                                          \
         value = max_cap;                                                                                                       \
@@ -535,58 +452,42 @@ std::vector<uint8_t> Ungzip(const void* data, const size_t dataLen)
         value += value_to_add;                                                                                                 \
     }
 
- __attribute__ ((hot)) int8_t add_clamp_int8_t(int8_t value, int8_t value_to_add)
+__attribute__ ((hot)) int8_t AddClamp_int8_t(int8_t value, int8_t value_to_add)
 {
-    add_clamp_body(value, value_to_add, INT8_MIN, INT8_MAX);
+    ADD_CLAMP_BODY(value, value_to_add, INT8_MIN, INT8_MAX);
     return value;
 }
 
- __attribute__ ((hot)) int16_t add_clamp_int16_t(int16_t value, int16_t value_to_add)
+__attribute__ ((hot)) int16_t AddClamp_int16_t(int16_t value, int16_t value_to_add)
 {
-    add_clamp_body(value, value_to_add, INT16_MIN, INT16_MAX);
+    ADD_CLAMP_BODY(value, value_to_add, INT16_MIN, INT16_MAX);
     return value;
 }
 
- __attribute__ ((hot)) int32_t add_clamp_int32_t(int32_t value, int32_t value_to_add)
+
+__attribute__ ((hot)) int32_t AddClamp_int32_t(int32_t value, int32_t value_to_add)
 {
-    add_clamp_body(value, value_to_add, INT32_MIN, INT32_MAX);
+    ADD_CLAMP_BODY(value, value_to_add, INT32_MIN, INT32_MAX);
     return value;
 }
 
- __attribute__ ((hot)) int64_t add_clamp_int64_t(int64_t value, int64_t value_to_add)
+__attribute__ ((hot)) int64_t AddClamp_int64_t(int64_t value, int64_t value_to_add)
 {
-    add_clamp_body(value, value_to_add, INT64_MIN, INT64_MAX);
+    ADD_CLAMP_BODY(value, value_to_add, INT64_MIN, INT64_MAX);
     return value;
 }
 
- __attribute__ ((hot)) money16 add_clamp_money16(money16 value, money16 value_to_add)
-{
-    // This function is intended only for clarity, as money16
-    // is technically the same as int16_t
-    assert_struct_size(money16, sizeof(int16_t));
-    return add_clamp_int16_t(value, value_to_add);
-}
-
- __attribute__ ((hot)) money32 add_clamp_money32(money32 value, money32 value_to_add)
-{
-    // This function is intended only for clarity, as money32
-    // is technically the same as int32_t
-    assert_struct_size(money32, sizeof(int32_t));
-    return add_clamp_int32_t(value, value_to_add);
-}
-
- __attribute__ ((hot)) money64 add_clamp_money64(money64 value, money64 value_to_add)
+__attribute__ ((hot)) money64 AddClamp_money64(money64 value, money64 value_to_add)
 {
     // This function is intended only for clarity, as money64
     // is technically the same as int64_t
     assert_struct_size(money64, sizeof(int64_t));
-    return add_clamp_int64_t(value, value_to_add);
+    return AddClamp_int64_t(value, value_to_add);
 }
 
 #undef add_clamp_body
 
-
-__attribute__ ((hot)) uint8_t soft_light(uint8_t a, uint8_t b)
+__attribute__ ((hot)) uint8_t SoftLight(uint8_t a, uint8_t b)
 {
     float fa = a / 255.0f;
     float fb = b / 255.0f;
@@ -605,7 +506,7 @@ __attribute__ ((hot)) uint8_t soft_light(uint8_t a, uint8_t b)
 /**
  * strftime wrapper which appends to an existing string.
  */
-size_t strcatftime(char* buffer, size_t bufferSize, const char* format, const struct tm* tp)
+size_t StrCatFTime(char* buffer, size_t bufferSize, const char* format, const struct tm* tp)
 {
     size_t stringLen = strnlen(buffer, bufferSize);
     if (stringLen < bufferSize)

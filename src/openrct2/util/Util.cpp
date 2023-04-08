@@ -24,76 +24,7 @@
 #include <ctime>
 #include <random>
 
-int32_t squaredmetres_to_squaredfeet(int32_t squaredMetres)
-{
-    // 1 metre squared = 10.7639104 feet squared
-    // RCT2 approximates as 11
-    return squaredMetres * 11;
-}
 
-int32_t metres_to_feet(int32_t metres)
-{
-    // 1 metre = 3.2808399 feet
-    // RCT2 approximates as 3.28125
-    return (metres * 840) / 256;
-}
-
-int32_t mph_to_kmph(int32_t mph)
-{
-    // 1 mph = 1.60934 kmph
-    // RCT2 approximates as 1.609375
-    return (mph * 1648) >> 10;
-}
-
-int32_t mph_to_dmps(int32_t mph)
-{
-    // 1 mph = 4.4704 decimeters/s
-    return (mph * 73243) >> 14;
-}
-
-int32_t bitscanforward(int32_t source)
-{
-#if defined(_MSC_VER) && (_MSC_VER >= 1400) // Visual Studio 2005
-    DWORD i;
-    uint8_t success = _BitScanForward(&i, static_cast<uint32_t>(source));
-    return success != 0 ? i : -1;
-#elif defined(__GNUC__)
-    int32_t success = __builtin_ffs(source);
-    return success - 1;
-#else
-#    pragma message("Falling back to iterative bitscan forward, consider using intrinsics")
-    // This is a low-hanging optimisation boost, check if your compiler offers
-    // any intrinsic.
-    // cf. https://github.com/OpenRCT2/OpenRCT2/pull/2093
-    for (int32_t i = 0; i < 32; i++)
-        if (source & (1u << i))
-            return i;
-
-    return -1;
-#endif
-}
-
-int32_t bitscanforward(int64_t source)
-{
-#if defined(_MSC_VER) && (_MSC_VER >= 1400) && defined(_M_X64) // Visual Studio 2005
-    DWORD i;
-    uint8_t success = _BitScanForward64(&i, static_cast<uint64_t>(source));
-    return success != 0 ? i : -1;
-#elif defined(__GNUC__)
-    int32_t success = __builtin_ffsll(source);
-    return success - 1;
-#else
-#    pragma message("Falling back to iterative bitscan forward, consider using intrinsics")
-    // This is a low-hanging optimisation boost, check if your compiler offers
-    // any intrinsic.
-    // cf. https://github.com/OpenRCT2/OpenRCT2/pull/2093
-    for (int32_t i = 0; i < 64; i++)
-        if (source & (1uLL << i))
-            return i;
-
-    return -1;
-#endif
-}
 
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
 #    include <cpuid.h>
@@ -161,7 +92,7 @@ bool avx2_available()
     return false;
 }
 
-static bool bitcount_popcnt_available()
+/*static bool bitcount_popcnt_available()
 {
 #ifdef OPENRCT2_X86
     // POPCNT support is declared as the 23rd bit of ECX with CPUID(EAX = 1).
@@ -172,9 +103,9 @@ static bool bitcount_popcnt_available()
     }
 #endif
     return false;
-}
+}*/
 
-static int32_t bitcount_popcnt(uint32_t source)
+/*static int32_t bitcount_popcnt(uint32_t source)
 {
 // Use CPUID defines to figure out calling style
 #if defined(OpenRCT2_CPUID_GNUC_X86)
@@ -189,9 +120,9 @@ static int32_t bitcount_popcnt(uint32_t source)
     openrct2_assert(false, "bitcount_popcnt() called, without support compiled in");
     return INT_MAX;
 #endif
-}
+}*/
 
-static int32_t bitcount_lut(uint32_t source)
+/*static int32_t bitcount_lut(uint32_t source)
 {
     // https://graphics.stanford.edu/~seander/bithacks.html
     static constexpr const uint8_t BitsSetTable256[256] = {
@@ -202,19 +133,20 @@ static int32_t bitcount_lut(uint32_t source)
     };
     return BitsSetTable256[source & 0xff] + BitsSetTable256[(source >> 8) & 0xff] + BitsSetTable256[(source >> 16) & 0xff]
         + BitsSetTable256[source >> 24];
-}
+}*/
 
-static int32_t (*bitcount_fn)(uint32_t);
+//static int32_t (*bitcount_fn)(uint32_t);
 
 void bitcount_init()
 {
-    bitcount_fn = bitcount_popcnt_available() ? bitcount_popcnt : bitcount_lut;
+    return;
+    //bitcount_fn = bitcount_popcnt_available() ? bitcount_popcnt : bitcount_lut;
 }
 
-int32_t bitcount(uint32_t source)
+/*int32_t bitcount(uint32_t source)
 {
     return bitcount_fn(source);
-}
+}*/
 
 /* case insensitive compare */
 int32_t strcicmp(char const* a, char const* b)
@@ -603,31 +535,31 @@ std::vector<uint8_t> Ungzip(const void* data, const size_t dataLen)
         value += value_to_add;                                                                                                 \
     }
 
-int8_t add_clamp_int8_t(int8_t value, int8_t value_to_add)
+ __attribute__ ((hot)) int8_t add_clamp_int8_t(int8_t value, int8_t value_to_add)
 {
     add_clamp_body(value, value_to_add, INT8_MIN, INT8_MAX);
     return value;
 }
 
-int16_t add_clamp_int16_t(int16_t value, int16_t value_to_add)
+ __attribute__ ((hot)) int16_t add_clamp_int16_t(int16_t value, int16_t value_to_add)
 {
     add_clamp_body(value, value_to_add, INT16_MIN, INT16_MAX);
     return value;
 }
 
-int32_t add_clamp_int32_t(int32_t value, int32_t value_to_add)
+ __attribute__ ((hot)) int32_t add_clamp_int32_t(int32_t value, int32_t value_to_add)
 {
     add_clamp_body(value, value_to_add, INT32_MIN, INT32_MAX);
     return value;
 }
 
-int64_t add_clamp_int64_t(int64_t value, int64_t value_to_add)
+ __attribute__ ((hot)) int64_t add_clamp_int64_t(int64_t value, int64_t value_to_add)
 {
     add_clamp_body(value, value_to_add, INT64_MIN, INT64_MAX);
     return value;
 }
 
-money16 add_clamp_money16(money16 value, money16 value_to_add)
+ __attribute__ ((hot)) money16 add_clamp_money16(money16 value, money16 value_to_add)
 {
     // This function is intended only for clarity, as money16
     // is technically the same as int16_t
@@ -635,7 +567,7 @@ money16 add_clamp_money16(money16 value, money16 value_to_add)
     return add_clamp_int16_t(value, value_to_add);
 }
 
-money32 add_clamp_money32(money32 value, money32 value_to_add)
+ __attribute__ ((hot)) money32 add_clamp_money32(money32 value, money32 value_to_add)
 {
     // This function is intended only for clarity, as money32
     // is technically the same as int32_t
@@ -643,7 +575,7 @@ money32 add_clamp_money32(money32 value, money32 value_to_add)
     return add_clamp_int32_t(value, value_to_add);
 }
 
-money64 add_clamp_money64(money64 value, money64 value_to_add)
+ __attribute__ ((hot)) money64 add_clamp_money64(money64 value, money64 value_to_add)
 {
     // This function is intended only for clarity, as money64
     // is technically the same as int64_t
@@ -653,24 +585,8 @@ money64 add_clamp_money64(money64 value, money64 value_to_add)
 
 #undef add_clamp_body
 
-uint8_t lerp(uint8_t a, uint8_t b, float t)
-{
-    if (t <= 0)
-        return a;
-    if (t >= 1)
-        return b;
 
-    int32_t range = b - a;
-    int32_t amount = static_cast<int32_t>(range * t);
-    return static_cast<uint8_t>(a + amount);
-}
-
-float flerp(float a, float b, float f)
-{
-    return (a * (1.0f - f)) + (b * f);
-}
-
-uint8_t soft_light(uint8_t a, uint8_t b)
+__attribute__ ((hot)) uint8_t soft_light(uint8_t a, uint8_t b)
 {
     float fa = a / 255.0f;
     float fb = b / 255.0f;

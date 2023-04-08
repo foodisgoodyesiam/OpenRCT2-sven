@@ -18,7 +18,7 @@
 #include <type_traits>
 #include <vector>
 
-__attribute__ ((always_inline, artificial)) inline int32_t int32_t SquaredMetresToSquaredFeet(int32_t squaredMetres)
+__attribute__ ((always_inline, artificial)) inline int32_t SquaredMetresToSquaredFeet(int32_t squaredMetres)
 {
     // 1 metre squared = 10.7639104 feet squared
     // RCT2 approximates as 11
@@ -93,7 +93,7 @@ __attribute__ ((hot)) inline uint8_t Lerp(uint8_t a, uint8_t b, float t)
     int32_t amount = static_cast<int32_t>(range * t);
     return static_cast<uint8_t>(a + amount);
 }
-__attribute__ ((always_inline, hot)) inline float Flerp(float a, float b, float f)
+__attribute__ ((always_inline, hot)) inline float FLerp(float a, float b, float f)
 {
     return (a * (1.0f - f)) + (b * f);
 }

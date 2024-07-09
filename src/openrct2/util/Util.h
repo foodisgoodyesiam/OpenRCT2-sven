@@ -18,18 +18,17 @@
 #include <type_traits>
 #include <vector>
 
-int32_t SquaredMetresToSquaredFeet(int32_t squaredMetres);
-int32_t MetresToFeet(int32_t metres);
-int32_t MphToKmph(int32_t mph);
-int32_t MphToDmps(int32_t mph);
+int32_t SquaredMetresToSquaredFeet(int32_t squaredMetres) __attribute__ ((const));
+int32_t MetresToFeet(int32_t metres) __attribute__ ((const));
+int32_t MphToKmph(int32_t mph) __attribute__ ((const));
+int32_t MphToDmps(int32_t mph) __attribute__ ((const));
 
-bool SSE41Available();
-bool AVX2Available();
+bool SSE41Available() __attribute__ ((const));
+bool AVX2Available() __attribute__ ((const));
 
-int32_t UtilBitScanForward(int32_t source);
-int32_t UtilBitScanForward(int64_t source);
-void BitCountInit();
-int32_t BitCount(uint32_t source);
+int32_t UtilBitScanForward(int32_t source) __attribute__ ((const));
+int32_t UtilBitScanForward(int64_t source) __attribute__ ((const));
+inline int32_t BitCount(uint32_t source) __attribute__ ((always_inline, const));
 int32_t StrLogicalCmp(char const* a, char const* b);
 char* SafeStrCpy(char* destination, const char* source, size_t num);
 char* SafeStrCat(char* destination, const char* source, size_t size);
@@ -68,4 +67,8 @@ template<typename... T> [[nodiscard]] constexpr uint64_t EnumsToFlags(T... types
 template<typename TEnum> constexpr auto EnumValue(TEnum enumerator) noexcept
 {
     return static_cast<std::underlying_type_t<TEnum>>(enumerator);
+}
+
+inline int32_t BitCount(uint32_t source) {
+    return __builtin_popcount(source);
 }

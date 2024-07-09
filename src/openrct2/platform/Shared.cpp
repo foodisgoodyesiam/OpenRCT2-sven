@@ -47,7 +47,7 @@ namespace Platform
 #endif // __ANDROID__
 
             InitTicks();
-            BitCountInit();
+            //BitCountInit();
             MaskInit();
         }
     }

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,7 @@
 #include "../Cheats.h"
 #include "../Context.h"
 #include "../Game.h"
+#include "../GameState.h"
 #include "../Input.h"
 #include "../actions/MazeSetTrackAction.h"
 #include "../actions/TrackPlaceAction.h"
@@ -17,7 +18,6 @@
 #include "../entity/Staff.h"
 #include "../interface/Viewport.h"
 #include "../network/network.h"
-#include "../paint/VirtualFloor.h"
 #include "../ride/RideConstruction.h"
 #include "../ride/RideData.h"
 #include "../ride/Track.h"
@@ -30,7 +30,9 @@
 #include <iterator>
 #include <tuple>
 
+using namespace OpenRCT2;
 using namespace OpenRCT2::TrackMetaData;
+
 bool gDisableErrorWindowSound = false;
 
 RideConstructionState _rideConstructionState2;
@@ -44,7 +46,7 @@ money64 PlaceProvisionalTrackPiece(
 {
     auto ride = GetRide(rideIndex);
     if (ride == nullptr)
-        return MONEY64_UNDEFINED;
+        return kMoney64Undefined;
 
     RideConstructionRemoveGhosts();
     const auto& rtd = ride->GetRideTypeDescriptor();
@@ -56,22 +58,13 @@ money64 PlaceProvisionalTrackPiece(
         auto result = GameActions::Execute(&gameAction);
 
         if (result.Error != GameActions::Status::Ok)
-            return MONEY64_UNDEFINED;
+            return kMoney64Undefined;
 
         _unkF440C5 = { trackPos, static_cast<Direction>(trackDirection) };
         _currentTrackSelectionFlags |= TRACK_SELECTION_FLAG_TRACK;
-        ViewportSetVisibility(3);
-        if (_currentTrackSlopeEnd != 0)
-            ViewportSetVisibility(2);
-
-        // Invalidate previous track piece (we may not be changing height!)
-        VirtualFloorInvalidate();
-
-        if (!SceneryToolIsActive())
-        {
-            // Set new virtual floor height.
-            VirtualFloorSetHeight(trackPos.z);
-        }
+        ViewportSetVisibility(ViewportVisibility::UndergroundViewOff);
+        if (_currentTrackPitchEnd != TrackPitch::None)
+            ViewportSetVisibility(ViewportVisibility::TrackHeights);
 
         return result.Cost;
     }
@@ -83,37 +76,25 @@ money64 PlaceProvisionalTrackPiece(
     // This command must not be sent over the network
     auto res = GameActions::Execute(&trackPlaceAction);
     if (res.Error != GameActions::Status::Ok)
-        return MONEY64_UNDEFINED;
+        return kMoney64Undefined;
 
-    int16_t z_begin, z_end;
+    int16_t z_begin{};
     const auto& ted = GetTrackElementDescriptor(trackType);
     const TrackCoordinates& coords = ted.Coordinates;
-    if (!ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_HAS_NO_TRACK))
+    if (ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_HAS_TRACK))
     {
         z_begin = coords.z_begin;
-        z_end = coords.z_end;
-    }
-    else
-    {
-        z_end = z_begin = coords.z_begin;
     }
 
     _unkF440C5 = { trackPos.x, trackPos.y, trackPos.z + z_begin, static_cast<Direction>(trackDirection) };
     _currentTrackSelectionFlags |= TRACK_SELECTION_FLAG_TRACK;
 
     const auto resultData = res.GetData<TrackPlaceActionResult>();
-    ViewportSetVisibility((resultData.GroundFlags & ELEMENT_IS_UNDERGROUND) ? 1 : 3);
-    if (_currentTrackSlopeEnd != 0)
-        ViewportSetVisibility(2);
-
-    // Invalidate previous track piece (we may not be changing height!)
-    VirtualFloorInvalidate();
-
-    if (!SceneryToolIsActive())
-    {
-        // Set height to where the next track piece would begin
-        VirtualFloorSetHeight(trackPos.z - z_begin + z_end);
-    }
+    const auto visiblity = (resultData.GroundFlags & ELEMENT_IS_UNDERGROUND) ? ViewportVisibility::UndergroundViewOn
+                                                                             : ViewportVisibility::UndergroundViewOff;
+    ViewportSetVisibility(visiblity);
+    if (_currentTrackPitchEnd != TrackPitch::None)
+        ViewportSetVisibility(ViewportVisibility::TrackHeights);
 
     return res.Cost;
 }
@@ -123,17 +104,17 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
     auto intent = Intent(INTENT_ACTION_RIDE_CONSTRUCTION_UPDATE_PIECES);
     ContextBroadcastIntent(&intent);
 
-    uint8_t startSlope = _previousTrackSlopeEnd;
-    uint8_t endSlope = _currentTrackSlopeEnd;
-    uint8_t startBank = _previousTrackBankEnd;
-    uint8_t endBank = _currentTrackBankEnd;
+    auto startSlope = _previousTrackPitchEnd;
+    auto endSlope = _currentTrackPitchEnd;
+    auto startBank = _previousTrackRollEnd;
+    auto endBank = _currentTrackRollEnd;
 
     if (_rideConstructionState == RideConstructionState::Back)
     {
-        startSlope = _currentTrackSlopeEnd;
-        endSlope = _previousTrackSlopeEnd;
-        startBank = _currentTrackBankEnd;
-        endBank = _previousTrackBankEnd;
+        startSlope = _currentTrackPitchEnd;
+        endSlope = _previousTrackPitchEnd;
+        startBank = _currentTrackRollEnd;
+        endBank = _previousTrackRollEnd;
     }
 
     auto curve = _currentTrackCurve;
@@ -143,7 +124,7 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
     }
 
     bool startsDiagonal = (_currentTrackPieceDirection & (1 << 2)) != 0;
-    if (curve == TRACK_CURVE_LEFT_LARGE || curve == TRACK_CURVE_RIGHT_LARGE)
+    if (curve == EnumValue(TrackCurve::LeftLarge) || curve == EnumValue(TrackCurve::RightLarge))
     {
         if (_rideConstructionState == RideConstructionState::Back)
         {
@@ -157,7 +138,7 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
         {
             const TrackDescriptor* trackDescriptor = &gTrackDescriptors[i];
 
-            if (trackDescriptor->track_curve != curve)
+            if (EnumValue(trackDescriptor->track_curve) != curve)
                 continue;
             if (trackDescriptor->starts_diagonal != startsDiagonal)
                 continue;
@@ -165,9 +146,9 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
                 continue;
             if (trackDescriptor->slope_end != endSlope)
                 continue;
-            if (trackDescriptor->bank_start != startBank)
+            if (trackDescriptor->RollStart != startBank)
                 continue;
-            if (trackDescriptor->bank_end != endBank)
+            if (trackDescriptor->RollEnd != endBank)
                 continue;
 
             return std::make_tuple(true, trackDescriptor->track_element);
@@ -181,12 +162,12 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
         case TrackElemType::EndStation:
         case TrackElemType::SBendLeft:
         case TrackElemType::SBendRight:
-            if (startSlope != TRACK_SLOPE_NONE || endSlope != TRACK_SLOPE_NONE)
+            if (startSlope != TrackPitch::None || endSlope != TrackPitch::None)
             {
                 return std::make_tuple(false, 0);
             }
 
-            if (startBank != TRACK_BANK_NONE || endBank != TRACK_BANK_NONE)
+            if (startBank != TrackRoll::None || endBank != TrackRoll::None)
             {
                 return std::make_tuple(false, 0);
             }
@@ -195,21 +176,21 @@ static std::tuple<bool, track_type_t> window_ride_construction_update_state_get_
 
         case TrackElemType::LeftVerticalLoop:
         case TrackElemType::RightVerticalLoop:
-            if (startBank != TRACK_BANK_NONE || endBank != TRACK_BANK_NONE)
+            if (startBank != TrackRoll::None || endBank != TrackRoll::None)
             {
                 return std::make_tuple(false, 0);
             }
 
             if (_rideConstructionState == RideConstructionState::Back)
             {
-                if (endSlope != TRACK_SLOPE_DOWN_25)
+                if (endSlope != TrackPitch::Down25)
                 {
                     return std::make_tuple(false, 0);
                 }
             }
             else
             {
-                if (startSlope != TRACK_SLOPE_UP_25)
+                if (startSlope != TrackPitch::Up25)
                 {
                     return std::make_tuple(false, 0);
                 }
@@ -295,17 +276,17 @@ bool WindowRideConstructionUpdateState(
     }
 
     const auto& rtd = ride->GetRideTypeDescriptor();
-    if (rtd.HasFlag(RIDE_TYPE_FLAG_TRACK_ELEMENTS_HAVE_TWO_VARIETIES)
-        && _currentTrackAlternative & RIDE_TYPE_ALTERNATIVE_TRACK_PIECES)
+    const auto trackDrawerDecriptor = getCurrentTrackDrawerDescriptor(rtd);
+    if (trackDrawerDecriptor.HasCoveredPieces() && _currentTrackAlternative & RIDE_TYPE_ALTERNATIVE_TRACK_PIECES)
     {
-        auto availablePieces = rtd.CoveredTrackPieces;
+        auto availablePieces = trackDrawerDecriptor.Covered.EnabledTrackPieces;
         const auto& ted = GetTrackElementDescriptor(trackType);
         auto alternativeType = ted.AlternativeType;
         // this method limits the track element types that can be used
         if (alternativeType != TrackElemType::None && (availablePieces.get(trackType)))
         {
             trackType = alternativeType;
-            if (!gCheatsEnableChainLiftOnAllTrack)
+            if (!GetGameState().Cheats.EnableChainLiftOnAllTrack)
                 liftHillAndInvertedState &= ~CONSTRUCTION_LIFT_HILL_SELECTED;
         }
     }
@@ -355,7 +336,7 @@ bool WindowRideConstructionUpdateState(
         turnOffLiftHill = true;
     }
 
-    if (turnOffLiftHill && !gCheatsEnableChainLiftOnAllTrack)
+    if (turnOffLiftHill && !GetGameState().Cheats.EnableChainLiftOnAllTrack)
     {
         liftHillAndInvertedState &= ~CONSTRUCTION_LIFT_HILL_SELECTED;
         _currentTrackLiftHill &= ~CONSTRUCTION_LIFT_HILL_SELECTED;
@@ -368,7 +349,7 @@ bool WindowRideConstructionUpdateState(
 
     if (TrackTypeHasSpeedSetting(trackType))
     {
-        properties = _currentBrakeSpeed2;
+        properties = _currentBrakeSpeed;
     }
     else
     {
@@ -393,16 +374,6 @@ bool WindowRideConstructionUpdateState(
 
 /**
  *
- *  rct2: 0x006C84CE
- */
-void WindowRideConstructionUpdateActiveElements()
-{
-    auto intent = Intent(INTENT_ACTION_RIDE_CONSTRUCTION_UPDATE_ACTIVE_ELEMENTS);
-    ContextBroadcastIntent(&intent);
-}
-
-/**
- *
  *  rct2: 0x0066DB3D
  */
 bool SceneryToolIsActive()
@@ -410,20 +381,10 @@ bool SceneryToolIsActive()
     auto toolWindowClassification = gCurrentToolWidget.window_classification;
     WidgetIndex toolWidgetIndex = gCurrentToolWidget.widget_index;
     if (InputTestFlag(INPUT_FLAG_TOOL_ACTIVE))
-        if (toolWindowClassification == WindowClass::TopToolbar && toolWidgetIndex == WC_TOP_TOOLBAR__WIDX_SCENERY)
+    {
+        if (toolWindowClassification == WindowClass::Scenery && toolWidgetIndex == WC_SCENERY__WIDX_SCENERY_BACKGROUND)
             return true;
+    }
 
     return false;
-}
-
-void SceneryInit()
-{
-    auto intent = Intent(INTENT_ACTION_INIT_SCENERY);
-    ContextBroadcastIntent(&intent);
-}
-
-void ScenerySetDefaultPlacementConfiguration()
-{
-    auto intent = Intent(INTENT_ACTION_SET_DEFAULT_SCENERY_CONFIG);
-    ContextBroadcastIntent(&intent);
 }

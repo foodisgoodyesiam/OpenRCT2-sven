@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -14,23 +14,28 @@
 #include "EntityList.h"
 #include "EntityRegistry.h"
 
+#include <algorithm>
 #include <cmath>
+
+void EntityTweener::AddEntity(EntityBase* entity)
+{
+    Entities.push_back(entity);
+    PrePos.emplace_back(entity->GetLocation());
+}
+
 void EntityTweener::PopulateEntities()
 {
     for (auto ent : EntityList<Guest>())
     {
-        Entities.push_back(ent);
-        PrePos.emplace_back(ent->GetLocation());
+        AddEntity(ent);
     }
     for (auto ent : EntityList<Staff>())
     {
-        Entities.push_back(ent);
-        PrePos.emplace_back(ent->GetLocation());
+        AddEntity(ent);
     }
     for (auto ent : EntityList<Vehicle>())
     {
-        Entities.push_back(ent);
-        PrePos.emplace_back(ent->GetLocation());
+        AddEntity(ent);
     }
 }
 
@@ -57,9 +62,16 @@ void EntityTweener::PostTick()
     }
 }
 
+static bool CanTweenEntity(EntityBase* ent)
+{
+    if (ent->Is<Guest>() || ent->Is<Staff>() || ent->Is<Vehicle>())
+        return true;
+    return false;
+}
+
 void EntityTweener::RemoveEntity(EntityBase* entity)
 {
-    if (!entity->Is<Peep>() && !entity->Is<Vehicle>())
+    if (!CanTweenEntity(entity))
     {
         // Only peeps and vehicles are tweened, bail if type is incorrect.
         return;

@@ -1,13 +1,15 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
  *
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
+
 #include "MoneyEffect.h"
 
+#include "../Diagnostic.h"
 #include "../OpenRCT2.h"
 #include "../config/Config.h"
 #include "../core/DataSerialiser.h"
@@ -15,14 +17,15 @@
 #include "../interface/Viewport.h"
 #include "../interface/Window.h"
 #include "../localisation/Formatting.h"
-#include "../localisation/Localisation.h"
 #include "../network/network.h"
 #include "../paint/Paint.h"
 #include "../profiling/Profiling.h"
 #include "../world/Map.h"
 #include "EntityRegistry.h"
 
-static constexpr const CoordsXY _moneyEffectMoveOffset[] = {
+using namespace OpenRCT2;
+
+static constexpr CoordsXY _moneyEffectMoveOffset[] = {
     { 1, -1 },
     { 1, 1 },
     { -1, 1 },
@@ -179,7 +182,7 @@ void MoneyEffect::Paint(PaintSession& session, int32_t imageDirection) const
         return;
     }
 
-    if (GuestPurchase && !gConfigGeneral.ShowGuestPurchases)
+    if (GuestPurchase && !Config::Get().general.ShowGuestPurchases)
     {
         // Don't show the money effect for guest purchases when the option is disabled.
         return;
@@ -192,7 +195,7 @@ void MoneyEffect::Paint(PaintSession& session, int32_t imageDirection) const
     }
 
     /** rct2: 0x0097EDA4 */
-    static constexpr const int8_t waveOffset[] = {
+    static constexpr int8_t waveOffset[] = {
         0, 1, 2, 2, 3, 3, 3, 3, 2, 2, 1, 0, -1, -2, -2, -3, -3, -3, -3, -2, -2, -1,
         0, 1, 2, 2, 3, 3, 3, 3, 2, 2, 1, 0, -1, -2, -2, -3, -3, -3, -3, -2, -2, -1,
     };

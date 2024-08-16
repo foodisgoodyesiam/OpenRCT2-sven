@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -48,8 +48,8 @@ protected:
     {
         RatingTuple ratings = ride.ratings;
         std::string line = String::StdFormat(
-            "%s: (%d, %d, %d)", ride.GetRideTypeDescriptor().EnumName, static_cast<int>(ratings.Excitement),
-            static_cast<int>(ratings.Intensity), static_cast<int>(ratings.Nausea));
+            "%s: (%d, %d, %d)", ride.GetRideTypeDescriptor().EnumName, static_cast<int>(ratings.excitement),
+            static_cast<int>(ratings.intensity), static_cast<int>(ratings.nausea));
         return line;
     }
 
@@ -65,7 +65,6 @@ protected:
         gOpenRCT2Headless = true;
         gOpenRCT2NoGraphics = true;
 
-        Platform::CoreInit();
         auto context = CreateContext();
         bool initialised = context->Initialise();
         ASSERT_TRUE(initialised);
@@ -98,4 +97,9 @@ TEST_F(RideRatings, bpb)
 TEST_F(RideRatings, BigMap)
 {
     TestRatings("BigMapTest.sv6", 100);
+}
+
+TEST_F(RideRatings, EverythingPark)
+{
+    TestRatings("EverythingPark.park", 529);
 }

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,24 +10,27 @@
 #include "MazeSetTrackAction.h"
 
 #include "../Cheats.h"
+#include "../Diagnostic.h"
+#include "../GameState.h"
 #include "../core/MemoryStream.h"
 #include "../interface/Window.h"
-#include "../localisation/Localisation.h"
 #include "../localisation/StringIds.h"
 #include "../management/Finance.h"
+#include "../ride/MazeCost.h"
 #include "../ride/RideData.h"
 #include "../ride/Track.h"
 #include "../ride/TrackData.h"
-#include "../ride/gentle/Maze.h"
 #include "../world/ConstructionClearance.h"
 #include "../world/Footpath.h"
 #include "../world/Park.h"
+
+using namespace OpenRCT2;
 
 using namespace OpenRCT2::TrackMetaData;
 
 // clang-format off
 /** rct2: 0x00993CE9 */
-static constexpr const uint8_t Byte993CE9[] = {
+static constexpr uint8_t Byte993CE9[] = {
     0xFF, 0xE0, 0xFF,
     14, 0, 1, 2,
     6, 2, 4, 5,
@@ -36,7 +39,7 @@ static constexpr const uint8_t Byte993CE9[] = {
 };
 
 /** rct2: 0x00993CFC */
-static constexpr const uint8_t Byte993CFC[] = {
+static constexpr uint8_t Byte993CFC[] = {
     5, 12, 0xFF, 0xFF,
     9, 0, 0xFF, 0xFF,
     13, 4, 0xFF, 0xFF,
@@ -44,7 +47,7 @@ static constexpr const uint8_t Byte993CFC[] = {
 };
 
 /** rct2: 0x00993D0C */
-static constexpr const uint8_t Byte993D0C[] = {
+static constexpr uint8_t Byte993D0C[] = {
     3, 0, 0xFF, 0xFF,
     0, 1, 0xFF, 0xFF,
     1, 2, 0xFF, 0xFF,
@@ -88,7 +91,13 @@ GameActions::Result MazeSetTrackAction::Query() const
         return res;
     }
 
-    if (!LocationValid(_loc) || (!MapIsLocationOwned(_loc) && !gCheatsSandboxMode))
+    if (!LocationValid(_loc))
+    {
+        res.Error = GameActions::Status::InvalidParameters;
+        res.ErrorMessage = STR_OFF_EDGE_OF_MAP;
+        return res;
+    }
+    if (!MapIsLocationOwned(_loc) && !OpenRCT2::GetGameState().Cheats.SandboxMode)
     {
         res.Error = GameActions::Status::NotOwned;
         res.ErrorMessage = STR_LAND_NOT_OWNED_BY_PARK;
@@ -113,9 +122,9 @@ GameActions::Result MazeSetTrackAction::Query() const
     auto clearanceHeight = _loc.z + 32;
 
     auto heightDifference = baseHeight - surfaceElement->GetBaseZ();
-    if (heightDifference >= 0 && !gCheatsDisableSupportLimits)
+    if (heightDifference >= 0 && !OpenRCT2::GetGameState().Cheats.DisableSupportLimits)
     {
-        heightDifference /= COORDS_Z_PER_TINY_Z;
+        heightDifference /= kCoordsZPerTinyZ;
 
         auto* ride = GetRide(_rideIndex);
         const auto& rtd = ride->GetRideTypeDescriptor();
@@ -161,8 +170,9 @@ GameActions::Result MazeSetTrackAction::Query() const
         auto ride = GetRide(_rideIndex);
         if (ride == nullptr || ride->type == RIDE_CRASH_TYPE_NONE)
         {
+            LOG_ERROR("Ride not found for rideIndex %u", _rideIndex);
             res.Error = GameActions::Status::NoClearance;
-            res.ErrorMessage = STR_INVALID_SELECTION_OF_OBJECTS;
+            res.ErrorMessage = STR_ERR_RIDE_NOT_FOUND;
             return res;
         }
 
@@ -185,8 +195,9 @@ GameActions::Result MazeSetTrackAction::Execute() const
     auto ride = GetRide(_rideIndex);
     if (ride == nullptr)
     {
+        LOG_ERROR("Ride not found for rideIndex %u", _rideIndex);
         res.Error = GameActions::Status::InvalidParameters;
-        res.ErrorMessage = STR_NONE;
+        res.ErrorMessage = STR_ERR_RIDE_NOT_FOUND;
         return res;
     }
 
@@ -279,7 +290,7 @@ GameActions::Result MazeSetTrackAction::Execute() const
                 {
                     LOG_ERROR("No surface found");
                     res.Error = GameActions::Status::Unknown;
-                    res.ErrorMessage = STR_NONE;
+                    res.ErrorMessage = STR_ERR_SURFACE_ELEMENT_NOT_FOUND;
                     return res;
                 }
 

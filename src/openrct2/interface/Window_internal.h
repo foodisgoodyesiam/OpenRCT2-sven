@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "Colour.h"
 #include "Window.h"
 
 #include <list>
@@ -31,7 +32,6 @@ struct RCTObjectEntry;
  */
 struct WindowBase
 {
-    WindowEventList* event_handlers{};
     Viewport* viewport{};
     uint64_t disabled_widgets{};
     uint64_t pressed_widgets{};
@@ -51,53 +51,26 @@ struct WindowBase
     };
     uint16_t flags{};
     ScrollBar scrolls[3];
-    uint32_t list_item_positions[1024]{};
     uint16_t no_list_items{};     // 0 for no items
     int16_t selected_list_item{}; // -1 for none selected
     std::optional<Focus> focus;
     union
     {
-        CampaignVariables campaign;
-        NewRideVariables new_ride;
-        RideVariables ride;
-        TrackListVariables track_list;
-        ErrorVariables error;
-        void* custom_info;
-    };
-    union
-    {
-        int16_t page;
+        int16_t page{};
         TileInspectorPage tileInspectorPage;
-    };
-    union
-    {
-        int16_t picked_peep_old_x; // staff window: peep x gets set to 0x8000 on pickup, this is the old value
-        int16_t vehicleIndex;      // Ride window: selected car when setting vehicle colours
-        int16_t var_48C;
     };
     uint16_t frame_no{};              // updated every tic for motion in windows sprites
     uint16_t list_information_type{}; // 0 for none
-    union
-    {
-        int16_t picked_peep_frame; // Animation frame of picked peep in staff window and guest window
-        int16_t var_492;
-    };
-    union
-    {
-        uint16_t ride_colour;
-        const ScenarioIndexEntry* highlighted_scenario;
-    };
+    int16_t picked_peep_frame;        // Animation frame of picked peep in staff window and guest window
     int16_t selected_tab{};
-    int16_t var_4AE{};
     EntityId viewport_target_sprite{ EntityId::GetNull() };
     ScreenCoordsXY savedViewPos{};
     WindowClass classification{};
-    colour_t colours[6]{};
+    ColourWithFlags colours[6]{};
     VisibilityCache visibility{};
     EntityId viewport_smart_follow_sprite{ EntityId::GetNull() }; // Handles setting viewport target sprite etc
 
     void SetLocation(const CoordsXYZ& coords);
-    void ScrollToViewport();
     void Invalidate();
     void RemoveViewport();
 
@@ -106,11 +79,6 @@ struct WindowBase
     virtual ~WindowBase() = default;
 
     WindowBase& operator=(const WindowBase&) = delete;
-
-    virtual bool IsLegacy()
-    {
-        return true;
-    }
 
     // Events
     virtual void OnOpen()
@@ -194,12 +162,9 @@ struct WindowBase
     {
     }
     virtual CursorID OnCursor(WidgetIndex, const ScreenCoordsXY&, CursorID);
-    virtual void OnUnknown5()
+    virtual void OnLanguageChange()
     {
     }
-
-    void ResizeFrame();
-    void ResizeFrameWithPage();
 };
 
 #ifdef __WARN_SUGGEST_FINAL_METHODS__

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -31,7 +31,6 @@
 #include "../ride/Vehicle.h"
 #include "ObjectRepository.h"
 
-#include <algorithm>
 #include <iterator>
 #include <unordered_map>
 
@@ -58,7 +57,7 @@ static const uint8_t SpriteGroupMultiplier[EnumValue(SpriteGroupType::Count)] = 
 };
 static_assert(std::size(SpriteGroupMultiplier) == EnumValue(SpriteGroupType::Count));
 
-constexpr const uint8_t DefaultSteamSpawnPosition[] = { 11, 22 };
+constexpr uint8_t DefaultSteamSpawnPosition[] = { 11, 22 };
 
 static const EnumMap<CarEntryAnimation> AnimationNameLookup{
     { "none", CarEntryAnimation::None },
@@ -71,7 +70,7 @@ static const EnumMap<CarEntryAnimation> AnimationNameLookup{
     { "animalFlying", CarEntryAnimation::AnimalFlying },
 };
 
-constexpr const auto NumLegacyAnimationTypes = 11;
+constexpr auto NumLegacyAnimationTypes = 11;
 
 struct LegacyAnimationParameters
 {
@@ -80,7 +79,7 @@ struct LegacyAnimationParameters
     CarEntryAnimation Alias;
 };
 
-constexpr const LegacyAnimationParameters VehicleEntryDefaultAnimation[] = {
+constexpr LegacyAnimationParameters VehicleEntryDefaultAnimation[] = {
     { 0, 1, CarEntryAnimation::None },                  // None
     { 1 << 12, 4, CarEntryAnimation::SteamLocomotive }, // Miniature Railway Locomotive
     { 1 << 10, 2, CarEntryAnimation::SwanBoat },        // Swan Boat
@@ -108,7 +107,7 @@ static LegacyAnimationParameters GetDefaultAnimationParameters(uint8_t legacyAni
     return VehicleEntryDefaultAnimation[legacyAnimationType];
 }
 
-static constexpr SpritePrecision PrecisionFromNumFrames(uint8_t numRotationFrames)
+static constexpr SpritePrecision PrecisionFromNumFrames(uint32_t numRotationFrames)
 {
     if (numRotationFrames == 0)
         return SpritePrecision::None;
@@ -714,7 +713,7 @@ CarEntry RideObject::ReadJsonCar([[maybe_unused]] IReadObjectContext* context, j
     car.num_seats = Json::GetNumber<uint8_t>(jCar["numSeats"]);
     if (Json::GetBoolean(jCar["seatsInPairs"], true) && car.num_seats > 1)
     {
-        car.num_seats |= VEHICLE_SEAT_PAIR_FLAG;
+        car.num_seats |= kVehicleSeatPairFlag;
     }
 
     car.sprite_width = Json::GetNumber<uint8_t>(jCar["spriteWidth"]);
@@ -818,7 +817,7 @@ CarEntry RideObject::ReadJsonCar([[maybe_unused]] IReadObjectContext* context, j
             { "isReverserPassengerCar", CAR_ENTRY_FLAG_REVERSER_PASSENGER_CAR },
             { "hasInvertedSpriteSet", CAR_ENTRY_FLAG_HAS_INVERTED_SPRITE_SET },
             { "hasDodgemInUseLights", CAR_ENTRY_FLAG_DODGEM_INUSE_LIGHTS },
-            { "hasAdditionalColour2", CAR_ENTRY_FLAG_ENABLE_TERNARY_COLOUR },
+            { "hasAdditionalColour2", CAR_ENTRY_FLAG_ENABLE_TERTIARY_COLOUR },
             { "recalculateSpriteBounds", CAR_ENTRY_FLAG_RECALCULATE_SPRITE_BOUNDS },
             { "overrideNumberOfVerticalFrames", CAR_ENTRY_FLAG_OVERRIDE_NUM_VERTICAL_FRAMES },
             { "spriteBoundsIncludeInvertedSet", CAR_ENTRY_FLAG_SPRITE_BOUNDS_INCLUDE_INVERTED_SET },

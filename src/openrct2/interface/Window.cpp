@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,8 +10,10 @@
 #include "Window.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../Editor.h"
 #include "../Game.h"
+#include "../GameState.h"
 #include "../Input.h"
 #include "../OpenRCT2.h"
 #include "../audio/audio.h"
@@ -20,7 +22,6 @@
 #include "../drawing/Drawing.h"
 #include "../interface/Cursors.h"
 #include "../localisation/Formatting.h"
-#include "../localisation/Localisation.h"
 #include "../localisation/StringIds.h"
 #include "../platform/Platform.h"
 #include "../ride/RideAudio.h"
@@ -33,30 +34,26 @@
 #include "Widget.h"
 #include "Window_internal.h"
 
-#include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <functional>
 #include <iterator>
 #include <list>
 
+using namespace OpenRCT2;
+
 std::list<std::shared_ptr<WindowBase>> g_window_list;
 WindowBase* gWindowAudioExclusive;
 
-WidgetIdentifier gCurrentTextBox = { { WindowClass::Null, 0 }, 0 };
 WindowCloseModifier gLastCloseModifier = { { WindowClass::Null, 0 }, CloseWindowModifier::None };
-u8string gTextBoxInput;
-int32_t gTextBoxFrameNo = 0;
-bool gUsingWidgetTextBox = false;
-TextInputSession* gTextInput;
 
-uint16_t gWindowUpdateTicks;
-uint16_t gWindowMapFlashingFlags;
-colour_t gCurrentWindowColours[4];
+uint32_t gWindowUpdateTicks;
+colour_t gCurrentWindowColours[3];
 
 // converted from uint16_t values at 0x009A41EC - 0x009A4230
 // these are percentage coordinates of the viewport to centre to, if a window is obscuring a location, the next is tried
 // clang-format off
-static constexpr const float window_scroll_locations[][2] = {
+static constexpr float window_scroll_locations[][2] = {
     { 0.5f, 0.5f },
     { 0.75f, 0.5f },
     { 0.25f, 0.5f },
@@ -77,12 +74,11 @@ static constexpr const float window_scroll_locations[][2] = {
 };
 // clang-format on
 
-namespace WindowCloseFlags
+namespace OpenRCT2::WindowCloseFlags
 {
     static constexpr uint32_t None = 0;
-    static constexpr uint32_t IterateReverse = (1 << 0);
-    static constexpr uint32_t CloseSingle = (1 << 1);
-} // namespace WindowCloseFlags
+    static constexpr uint32_t CloseSingle = (1 << 0);
+} // namespace OpenRCT2::WindowCloseFlags
 
 static void WindowDrawCore(DrawPixelInfo& dpi, WindowBase& w, int32_t left, int32_t top, int32_t right, int32_t bottom);
 static void WindowDrawSingle(DrawPixelInfo& dpi, WindowBase& w, int32_t left, int32_t top, int32_t right, int32_t bottom);
@@ -99,8 +95,23 @@ void WindowVisitEach(std::function<void(WindowBase*)> func)
     auto windowList = g_window_list;
     for (auto& w : windowList)
     {
+        if (w->flags & WF_DEAD)
+            continue;
         func(w.get());
     }
+}
+
+void WindowSetFlagForAllViewports(uint32_t viewportFlag, bool enabled)
+{
+    WindowVisitEach([&](WindowBase* w) {
+        if (w->viewport != nullptr)
+        {
+            if (enabled)
+                w->viewport->flags |= viewportFlag;
+            else
+                w->viewport->flags &= ~viewportFlag;
+        }
+    });
 }
 
 /**
@@ -110,7 +121,7 @@ void WindowVisitEach(std::function<void(WindowBase*)> func)
 void WindowDispatchUpdateAll()
 {
     // gTooltipNotShownTicks++;
-    WindowVisitEach([&](WindowBase* w) { WindowEventUpdateCall(w); });
+    WindowVisitEach([&](WindowBase* w) { w->OnUpdate(); });
 }
 
 void WindowUpdateAllViewports()
@@ -129,15 +140,14 @@ void WindowUpdateAllViewports()
  */
 void WindowUpdateAll()
 {
-    // WindowUpdateAllViewports();
+    WindowFlushDead();
 
-    // 1000 tick update
-    gWindowUpdateTicks += gCurrentDeltaTime;
-    if (gWindowUpdateTicks >= 1000)
+    // Periodic update happens every second so 40 ticks.
+    if (gCurrentRealTimeTicks >= gWindowUpdateTicks)
     {
-        gWindowUpdateTicks = 0;
+        gWindowUpdateTicks = gCurrentRealTimeTicks + kGameUpdateFPS;
 
-        WindowVisitEach([](WindowBase* w) { WindowEventPeriodicUpdateCall(w); });
+        WindowVisitEach([](WindowBase* w) { w->OnPeriodicUpdate(); });
     }
 
     // Border flash invalidation
@@ -152,8 +162,13 @@ void WindowUpdateAll()
         }
     });
 
-    auto windowManager = OpenRCT2::GetContext()->GetUiContext()->GetWindowManager();
+    auto windowManager = GetContext()->GetUiContext()->GetWindowManager();
     windowManager->UpdateMouseWheel();
+}
+
+void WindowNotifyLanguageChange()
+{
+    WindowVisitEach([&](WindowBase* w) { w->OnLanguageChange(); });
 }
 
 static void WindowCloseSurplus(int32_t cap, WindowClass avoid_classification)
@@ -161,13 +176,15 @@ static void WindowCloseSurplus(int32_t cap, WindowClass avoid_classification)
     // find the amount of windows that are currently open
     auto count = static_cast<int32_t>(g_window_list.size());
     // difference between amount open and cap = amount to close
-    auto diff = count - WINDOW_LIMIT_RESERVED - cap;
+    auto diff = count - kWindowLimitReserved - cap;
     for (auto i = 0; i < diff; i++)
     {
         // iterates through the list until it finds the newest window, or a window that can be closed
         WindowBase* foundW{};
         for (auto& w : g_window_list)
         {
+            if (w->flags & WF_DEAD)
+                continue;
             if (!(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT | WF_NO_AUTO_CLOSE)))
             {
                 foundW = w.get();
@@ -188,10 +205,10 @@ static void WindowCloseSurplus(int32_t cap, WindowClass avoid_classification)
  */
 void WindowSetWindowLimit(int32_t value)
 {
-    int32_t prev = gConfigGeneral.WindowLimit;
-    int32_t val = std::clamp(value, WINDOW_LIMIT_MIN, WINDOW_LIMIT_MAX);
-    gConfigGeneral.WindowLimit = val;
-    ConfigSaveDefault();
+    int32_t prev = Config::Get().general.WindowLimit;
+    int32_t val = std::clamp<int32_t>(value, kWindowLimitMin, kWindowLimitMax);
+    Config::Get().general.WindowLimit = val;
+    Config::Save();
     // Checks if value decreases and then closes surplus
     // windows if one sets a limit lower than the number of windows open
     if (val < prev)
@@ -208,76 +225,40 @@ void WindowSetWindowLimit(int32_t value)
  */
 void WindowClose(WindowBase& w)
 {
-    auto itWindow = WindowGetIterator(&w);
-    if (itWindow == g_window_list.end())
-        return;
-
-    // Explicit copy of the shared ptr to keep the memory valid.
-    std::shared_ptr<WindowBase> window = *itWindow;
-
-    WindowEventCloseCall(window.get());
+    w.OnClose();
 
     // Remove viewport
-    window->RemoveViewport();
+    w.RemoveViewport();
 
     // Invalidate the window (area)
-    window->Invalidate();
+    w.Invalidate();
 
-    // The window list may have been modified in the close event
-    itWindow = WindowGetIterator(&w);
-    if (itWindow != g_window_list.end())
-        g_window_list.erase(itWindow);
+    w.flags |= WF_DEAD;
+}
+
+void WindowFlushDead()
+{
+    // Remove all windows in g_window_list that have the WF_DEAD flag
+    g_window_list.remove_if([](auto&& w) -> bool { return w->flags & WF_DEAD; });
 }
 
 template<typename TPred> static void WindowCloseByCondition(TPred pred, uint32_t flags = WindowCloseFlags::None)
 {
-    bool listUpdated;
-    do
+    for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); ++it)
     {
-        listUpdated = false;
+        auto& wnd = *(*it);
+        if (wnd.flags & WF_DEAD)
+            continue;
 
-        auto closeSingle = [&](std::shared_ptr<WindowBase> window) -> bool {
-            if (!pred(window.get()))
+        if (pred(&wnd))
+        {
+            WindowClose(wnd);
+            if (flags & WindowCloseFlags::CloseSingle)
             {
-                return false;
+                return;
             }
-
-            // Keep track of current amount, if a new window is created upon closing
-            // we need to break this current iteration and restart.
-            size_t previousCount = g_window_list.size();
-
-            WindowClose(*window.get());
-
-            if ((flags & WindowCloseFlags::CloseSingle) != 0)
-            {
-                // Only close a single one.
-                return true;
-            }
-
-            if (previousCount >= g_window_list.size())
-            {
-                // A new window was created during the close event.
-                return true;
-            }
-
-            // Keep closing windows.
-            return false;
-        };
-
-        // The closest to something like for_each_if is using find_if in order to avoid duplicate code
-        // to change the loop direction.
-        auto windowList = g_window_list;
-        if ((flags & WindowCloseFlags::IterateReverse) != 0)
-            listUpdated = std::find_if(windowList.rbegin(), windowList.rend(), closeSingle) != windowList.rend();
-        else
-            listUpdated = std::find_if(windowList.begin(), windowList.end(), closeSingle) != windowList.end();
-
-        // If requested to close only a single window and a new window was created during close
-        // we ignore it.
-        if ((flags & WindowCloseFlags::CloseSingle) != 0)
-            break;
-
-    } while (listUpdated);
+        }
+    }
 }
 
 /**
@@ -317,6 +298,8 @@ WindowBase* WindowFindByClass(WindowClass cls)
 {
     for (auto& w : g_window_list)
     {
+        if (w->flags & WF_DEAD)
+            continue;
         if (w->classification == cls)
         {
             return w.get();
@@ -336,6 +319,8 @@ WindowBase* WindowFindByNumber(WindowClass cls, rct_windownumber number)
 {
     for (auto& w : g_window_list)
     {
+        if (w->flags & WF_DEAD)
+            continue;
         if (w->classification == cls && w->number == number)
         {
             return w.get();
@@ -361,12 +346,12 @@ void WindowCloseTop()
 
     if (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR)
     {
-        if (gEditorStep != EditorStep::LandscapeEditor)
+        if (GetGameState().EditorStep != EditorStep::LandscapeEditor)
             return;
     }
 
     auto pred = [](WindowBase* w) -> bool { return !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT)); };
-    WindowCloseByCondition(pred, WindowCloseFlags::CloseSingle | WindowCloseFlags::IterateReverse);
+    WindowCloseByCondition(pred, WindowCloseFlags::CloseSingle);
 }
 
 /**
@@ -383,7 +368,6 @@ void WindowCloseAll()
 void WindowCloseAllExceptClass(WindowClass cls)
 {
     WindowCloseByClass(WindowClass::Dropdown);
-
     WindowCloseByCondition([cls](WindowBase* w) -> bool {
         return w->classification != cls && !(w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT));
     });
@@ -419,6 +403,9 @@ WindowBase* WindowFindFromPoint(const ScreenCoordsXY& screenCoords)
     for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
     {
         auto& w = *it;
+        if (w->flags & WF_DEAD)
+            continue;
+
         if (screenCoords.x < w->windowPos.x || screenCoords.x >= w->windowPos.x + w->width || screenCoords.y < w->windowPos.y
             || screenCoords.y >= w->windowPos.y + w->height)
             continue;
@@ -447,7 +434,7 @@ WindowBase* WindowFindFromPoint(const ScreenCoordsXY& screenCoords)
 WidgetIndex WindowFindWidgetFromPoint(WindowBase& w, const ScreenCoordsXY& screenCoords)
 {
     // Invalidate the window
-    WindowEventInvalidateCall(&w);
+    w.OnPrepareDraw();
 
     // Find the widget at point x, y
     WidgetIndex widget_index = -1;
@@ -587,62 +574,6 @@ void WidgetInvalidateByNumber(WindowClass cls, rct_windownumber number, WidgetIn
             WidgetInvalidate(*w, widgetIndex);
         }
     });
-}
-
-/**
- *
- *  rct2: 0x006EAE4E
- *
- * @param w The window (esi).
- */
-void WindowUpdateScrollWidgets(WindowBase& w)
-{
-    int32_t scrollIndex, width, height, scrollPositionChanged;
-    WidgetIndex widgetIndex;
-    Widget* widget;
-
-    widgetIndex = 0;
-    scrollIndex = 0;
-    for (widget = w.widgets; widget->type != WindowWidgetType::Last; widget++, widgetIndex++)
-    {
-        if (widget->type != WindowWidgetType::Scroll)
-            continue;
-
-        auto& scroll = w.scrolls[scrollIndex];
-        width = 0;
-        height = 0;
-        WindowGetScrollSize(&w, scrollIndex, &width, &height);
-        if (height == 0)
-        {
-            scroll.v_top = 0;
-        }
-        else if (width == 0)
-        {
-            scroll.h_left = 0;
-        }
-        width++;
-        height++;
-
-        scrollPositionChanged = 0;
-        if ((widget->content & SCROLL_HORIZONTAL) && width != scroll.h_right)
-        {
-            scrollPositionChanged = 1;
-            scroll.h_right = width;
-        }
-
-        if ((widget->content & SCROLL_VERTICAL) && height != scroll.v_bottom)
-        {
-            scrollPositionChanged = 1;
-            scroll.v_bottom = height;
-        }
-
-        if (scrollPositionChanged)
-        {
-            WidgetScrollUpdateThumbs(w, widgetIndex);
-            w.Invalidate();
-        }
-        scrollIndex++;
-    }
 }
 
 int32_t WindowGetScrollDataIndex(const WindowBase& w, WidgetIndex widget_index)
@@ -814,6 +745,8 @@ WindowBase* WindowGetMain()
 {
     for (auto& w : g_window_list)
     {
+        if (w->flags & WF_DEAD)
+            continue;
         if (w->classification == WindowClass::MainWindow)
         {
             return w.get();
@@ -853,7 +786,7 @@ void WindowScrollToLocation(WindowBase& w, const CoordsXYZ& coords)
             }
         }
 
-        auto screenCoords = Translate3DTo2DWithZ(GetCurrentRotation(), coords);
+        auto screenCoords = Translate3DTo2DWithZ(w.viewport->rotation, coords);
 
         int32_t i = 0;
         if (!(gScreenFlags & SCREEN_FLAGS_TITLE_DEMO))
@@ -906,66 +839,6 @@ void WindowScrollToLocation(WindowBase& w, const CoordsXYZ& coords)
     }
 }
 
-/**
- *
- *  rct2: 0x00688956
- */
-static void call_event_viewport_rotate_on_all_windows()
-{
-    WindowVisitEach([](WindowBase* w) { WindowEventViewportRotateCall(w); });
-}
-
-/**
- *
- *  rct2: 0x0068881A
- * direction can be used to alter the camera rotation:
- *      1: clockwise
- *      -1: anti-clockwise
- */
-void WindowRotateCamera(WindowBase& w, int32_t direction)
-{
-    Viewport* viewport = w.viewport;
-    if (viewport == nullptr)
-        return;
-
-    auto windowPos = ScreenCoordsXY{ (viewport->width >> 1), (viewport->height >> 1) } + viewport->pos;
-
-    // has something to do with checking if middle of the viewport is obstructed
-    Viewport* other;
-    auto mapXYCoords = ScreenGetMapXY(windowPos, &other);
-    CoordsXYZ coords{};
-
-    // other != viewport probably triggers on viewports in ride or guest window?
-    // naoXYCoords is nullopt if middle of viewport is obstructed by another window?
-    if (!mapXYCoords.has_value() || other != viewport)
-    {
-        auto viewPos = ScreenCoordsXY{ (viewport->view_width >> 1), (viewport->view_height >> 1) } + viewport->viewPos;
-
-        coords = ViewportAdjustForMapHeight(viewPos);
-    }
-    else
-    {
-        coords.x = mapXYCoords->x;
-        coords.y = mapXYCoords->y;
-        coords.z = TileElementHeight(coords);
-    }
-
-    gCurrentRotation = (GetCurrentRotation() + direction) & 3;
-
-    auto centreLoc = centre_2d_coordinates(coords, viewport);
-
-    if (centreLoc.has_value())
-    {
-        w.savedViewPos = centreLoc.value();
-        viewport->viewPos = *centreLoc;
-    }
-
-    w.Invalidate();
-
-    call_event_viewport_rotate_on_all_windows();
-    ResetAllSpriteQuadrantPlacements();
-}
-
 void WindowViewportGetMapCoordsByCursor(
     const WindowBase& w, int32_t* map_x, int32_t* map_y, int32_t* offset_x, int32_t* offset_y)
 {
@@ -974,8 +847,8 @@ void WindowViewportGetMapCoordsByCursor(
 
     // Compute map coordinate by mouse position.
     auto viewportPos = w.viewport->ScreenToViewportCoord(mouseCoords);
-    auto coordsXYZ = ViewportAdjustForMapHeight(viewportPos);
-    auto mapCoords = ViewportPosToMapPos(viewportPos, coordsXYZ.z);
+    auto coordsXYZ = ViewportAdjustForMapHeight(viewportPos, w.viewport->rotation);
+    auto mapCoords = ViewportPosToMapPos(viewportPos, coordsXYZ.z, w.viewport->rotation);
     *map_x = mapCoords.x;
     *map_y = mapCoords.y;
 
@@ -1050,7 +923,7 @@ void WindowZoomSet(WindowBase& w, ZoomLevel zoomLevel, bool atCursor)
     int32_t saved_map_y = 0;
     int32_t offset_x = 0;
     int32_t offset_y = 0;
-    if (gConfigGeneral.ZoomToCursor && atCursor)
+    if (Config::Get().general.ZoomToCursor && atCursor)
     {
         WindowViewportGetMapCoordsByCursor(w, &saved_map_x, &saved_map_y, &offset_x, &offset_y);
     }
@@ -1076,7 +949,7 @@ void WindowZoomSet(WindowBase& w, ZoomLevel zoomLevel, bool atCursor)
     }
 
     // Zooming to cursor? Centre around the tile we were hovering over just now.
-    if (gConfigGeneral.ZoomToCursor && atCursor)
+    if (Config::Get().general.ZoomToCursor && atCursor)
     {
         WindowViewportCentreTileAroundCursor(w, saved_map_x, saved_map_y, offset_x, offset_y);
     }
@@ -1085,45 +958,6 @@ void WindowZoomSet(WindowBase& w, ZoomLevel zoomLevel, bool atCursor)
     // a window on top of the viewport.
     WindowBringToFront(w);
     w.Invalidate();
-}
-
-/**
- *
- *  rct2: 0x006887A6
- */
-void WindowZoomIn(WindowBase& w, bool atCursor)
-{
-    WindowZoomSet(w, w.viewport->zoom - 1, atCursor);
-}
-
-/**
- *
- *  rct2: 0x006887E0
- */
-void WindowZoomOut(WindowBase& w, bool atCursor)
-{
-    WindowZoomSet(w, w.viewport->zoom + 1, atCursor);
-}
-
-void MainWindowZoom(bool zoomIn, bool atCursor)
-{
-    auto* mainWindow = WindowGetMain();
-    if (mainWindow == nullptr)
-        return;
-
-    if (gScreenFlags & SCREEN_FLAGS_TITLE_DEMO)
-        return;
-
-    if (gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR && gEditorStep != EditorStep::LandscapeEditor)
-        return;
-
-    if (gScreenFlags & SCREEN_FLAGS_TRACK_MANAGER)
-        return;
-
-    if (zoomIn)
-        WindowZoomIn(*mainWindow, atCursor);
-    else
-        WindowZoomOut(*mainWindow, atCursor);
 }
 
 /**
@@ -1201,6 +1035,8 @@ static void WindowDrawCore(DrawPixelInfo& dpi, WindowBase& w, int32_t left, int3
     for (auto it = WindowGetIterator(&w); it != g_window_list.end(); it++)
     {
         auto* v = (*it).get();
+        if (v->flags & WF_DEAD)
+            continue;
         if ((&w == v || (v->flags & WF_TRANSPARENT)) && WindowIsVisible(*v))
         {
             WindowDrawSingle(dpi, *v, left, top, right, bottom);
@@ -1257,99 +1093,14 @@ static void WindowDrawSingle(DrawPixelInfo& dpi, WindowBase& w, int32_t left, in
 
     // Invalidate modifies the window colours so first get the correct
     // colour before setting the global variables for the string painting
-    WindowEventInvalidateCall(&w);
+    w.OnPrepareDraw();
 
     // Text colouring
-    gCurrentWindowColours[0] = NOT_TRANSLUCENT(w.colours[0]);
-    gCurrentWindowColours[1] = NOT_TRANSLUCENT(w.colours[1]);
-    gCurrentWindowColours[2] = NOT_TRANSLUCENT(w.colours[2]);
-    gCurrentWindowColours[3] = NOT_TRANSLUCENT(w.colours[3]);
+    gCurrentWindowColours[0] = w.colours[0].colour;
+    gCurrentWindowColours[1] = w.colours[1].colour;
+    gCurrentWindowColours[2] = w.colours[2].colour;
 
-    WindowEventPaintCall(&w, copy);
-}
-
-/**
- *
- *  rct2: 0x00685BE1
- *
- * @param dpi (edi)
- * @param w (esi)
- */
-void WindowDrawViewport(DrawPixelInfo& dpi, WindowBase& w)
-{
-    ViewportRender(dpi, w.viewport, { { dpi.x, dpi.y }, { dpi.x + dpi.width, dpi.y + dpi.height } });
-}
-
-void WindowSetPosition(WindowBase& w, const ScreenCoordsXY& screenCoords)
-{
-    WindowMovePosition(w, screenCoords - w.windowPos);
-}
-
-void WindowMovePosition(WindowBase& w, const ScreenCoordsXY& deltaCoords)
-{
-    if (deltaCoords.x == 0 && deltaCoords.y == 0)
-        return;
-
-    // Invalidate old region
-    w.Invalidate();
-
-    // Translate window and viewport
-    w.windowPos += deltaCoords;
-    if (w.viewport != nullptr)
-    {
-        w.viewport->pos += deltaCoords;
-    }
-
-    // Invalidate new region
-    w.Invalidate();
-}
-
-void WindowResize(WindowBase& w, int32_t dw, int32_t dh)
-{
-    if (dw == 0 && dh == 0)
-        return;
-
-    // Invalidate old region
-    w.Invalidate();
-
-    // Clamp new size to minimum and maximum
-    w.width = std::clamp<int32_t>(w.width + dw, w.min_width, w.max_width);
-    w.height = std::clamp<int32_t>(w.height + dh, w.min_height, w.max_height);
-
-    WindowEventResizeCall(&w);
-    WindowEventInvalidateCall(&w);
-
-    // Update scroll widgets
-    for (auto& scroll : w.scrolls)
-    {
-        scroll.h_right = WINDOW_SCROLL_UNDEFINED;
-        scroll.v_bottom = WINDOW_SCROLL_UNDEFINED;
-    }
-    WindowUpdateScrollWidgets(w);
-
-    // Invalidate new region
-    w.Invalidate();
-}
-
-void WindowSetResize(WindowBase& w, int32_t minWidth, int32_t minHeight, int32_t maxWidth, int32_t maxHeight)
-{
-    w.min_width = minWidth;
-    w.min_height = minHeight;
-    w.max_width = maxWidth;
-    w.max_height = maxHeight;
-
-    // Clamp width and height to minimum and maximum
-    int32_t width = std::clamp<int32_t>(w.width, std::min(minWidth, maxWidth), std::max(minWidth, maxWidth));
-    int32_t height = std::clamp<int32_t>(w.height, std::min(minHeight, maxHeight), std::max(minHeight, maxHeight));
-
-    // Resize window if size has changed
-    if (w.width != width || w.height != height)
-    {
-        w.Invalidate();
-        w.width = width;
-        w.height = height;
-        w.Invalidate();
-    }
+    w.OnDraw(copy);
 }
 
 /**
@@ -1409,298 +1160,9 @@ void ToolCancel()
             // Abort tool event
             WindowBase* w = WindowFindByNumber(gCurrentToolWidget.window_classification, gCurrentToolWidget.window_number);
             if (w != nullptr)
-                WindowEventToolAbortCall(w, gCurrentToolWidget.widget_index);
+                w->OnToolAbort(gCurrentToolWidget.widget_index);
         }
     }
-}
-
-void WindowEventCloseCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnClose();
-    else if (w->event_handlers->close != nullptr)
-        w->event_handlers->close(w);
-}
-
-void WindowEventMouseUpCall(WindowBase* w, WidgetIndex widgetIndex)
-{
-    if (w->event_handlers == nullptr)
-        w->OnMouseUp(widgetIndex);
-    else if (w->event_handlers->mouse_up != nullptr)
-        w->event_handlers->mouse_up(w, widgetIndex);
-}
-
-void WindowEventResizeCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnResize();
-    else if (w->event_handlers->resize != nullptr)
-        w->event_handlers->resize(w);
-}
-
-void WindowEventMouseDownCall(WindowBase* w, WidgetIndex widgetIndex)
-{
-    if (w->event_handlers == nullptr)
-        w->OnMouseDown(widgetIndex);
-    else if (w->event_handlers->mouse_down != nullptr)
-        w->event_handlers->mouse_down(w, widgetIndex, &w->widgets[widgetIndex]);
-}
-
-void WindowEventDropdownCall(WindowBase* w, WidgetIndex widgetIndex, int32_t dropdownIndex)
-{
-    if (w->event_handlers == nullptr)
-    {
-        if (dropdownIndex != -1)
-        {
-            w->OnDropdown(widgetIndex, dropdownIndex);
-        }
-    }
-    else if (w->event_handlers->dropdown != nullptr)
-    {
-        w->event_handlers->dropdown(w, widgetIndex, dropdownIndex);
-    }
-}
-
-void WindowEventUnknown05Call(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-    {
-        w->OnUnknown5();
-    }
-    else if (w->event_handlers->unknown_05 != nullptr)
-    {
-        w->event_handlers->unknown_05(w);
-    }
-}
-
-void WindowEventUpdateCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnUpdate();
-    else if (w->event_handlers->update != nullptr)
-        w->event_handlers->update(w);
-}
-
-void WindowEventPeriodicUpdateCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnPeriodicUpdate();
-    else if (w->event_handlers->periodic_update != nullptr)
-        w->event_handlers->periodic_update(w);
-}
-
-void WindowEventToolUpdateCall(WindowBase* w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnToolUpdate(widgetIndex, screenCoords);
-    else if (w->event_handlers->tool_update != nullptr)
-        w->event_handlers->tool_update(w, widgetIndex, screenCoords);
-}
-
-void WindowEventToolDownCall(WindowBase* w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnToolDown(widgetIndex, screenCoords);
-    else if (w->event_handlers->tool_down != nullptr)
-        w->event_handlers->tool_down(w, widgetIndex, screenCoords);
-}
-
-void WindowEventToolDragCall(WindowBase* w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnToolDrag(widgetIndex, screenCoords);
-    else if (w->event_handlers->tool_drag != nullptr)
-        w->event_handlers->tool_drag(w, widgetIndex, screenCoords);
-}
-
-void WindowEventToolUpCall(WindowBase* w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnToolUp(widgetIndex, screenCoords);
-    else if (w->event_handlers->tool_up != nullptr)
-        w->event_handlers->tool_up(w, widgetIndex, screenCoords);
-}
-
-void WindowEventToolAbortCall(WindowBase* w, WidgetIndex widgetIndex)
-{
-    if (w->event_handlers == nullptr)
-        w->OnToolAbort(widgetIndex);
-    else if (w->event_handlers->tool_abort != nullptr)
-        w->event_handlers->tool_abort(w, widgetIndex);
-}
-
-void WindowGetScrollSize(WindowBase* w, int32_t scrollIndex, int32_t* width, int32_t* height)
-{
-    if (w->event_handlers == nullptr)
-    {
-        auto size = w->OnScrollGetSize(scrollIndex);
-        if (width != nullptr)
-            *width = size.width;
-        if (height != nullptr)
-            *height = size.height;
-    }
-    else if (w->event_handlers->get_scroll_size != nullptr)
-    {
-        w->event_handlers->get_scroll_size(w, scrollIndex, width, height);
-    }
-}
-
-void WindowEventScrollMousedownCall(WindowBase* w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnScrollMouseDown(scrollIndex, screenCoords);
-    else if (w->event_handlers->scroll_mousedown != nullptr)
-        w->event_handlers->scroll_mousedown(w, scrollIndex, screenCoords);
-}
-
-void WindowEventScrollMousedragCall(WindowBase* w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnScrollMouseDrag(scrollIndex, screenCoords);
-    else if (w->event_handlers->scroll_mousedrag != nullptr)
-        w->event_handlers->scroll_mousedrag(w, scrollIndex, screenCoords);
-}
-
-void WindowEventScrollMouseoverCall(WindowBase* w, int32_t scrollIndex, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-        w->OnScrollMouseOver(scrollIndex, screenCoords);
-    else if (w->event_handlers->scroll_mouseover != nullptr)
-        w->event_handlers->scroll_mouseover(w, scrollIndex, screenCoords);
-}
-
-void WindowEventTextinputCall(WindowBase* w, WidgetIndex widgetIndex, const char* text)
-{
-    if (w->event_handlers == nullptr)
-    {
-        if (text != nullptr)
-        {
-            w->OnTextInput(widgetIndex, text);
-        }
-    }
-    else if (w->event_handlers->text_input != nullptr)
-    {
-        w->event_handlers->text_input(w, widgetIndex, text);
-    }
-}
-
-void WindowEventViewportRotateCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnViewportRotate();
-    else if (w->event_handlers != nullptr)
-        if (w->event_handlers->viewport_rotate != nullptr)
-            w->event_handlers->viewport_rotate(w);
-}
-
-void WindowEventScrollSelectCall(WindowBase* w, int32_t scrollIndex, int32_t scrollAreaType)
-{
-    if (w->event_handlers == nullptr)
-        w->OnScrollSelect(scrollIndex, scrollAreaType);
-    else if (w->event_handlers->scroll_select != nullptr)
-        w->event_handlers->scroll_select(w, scrollIndex, scrollAreaType);
-}
-
-OpenRCT2String WindowEventTooltipCall(WindowBase* w, const WidgetIndex widgetIndex, const StringId fallback)
-{
-    if (w->event_handlers == nullptr)
-    {
-        return w->OnTooltip(widgetIndex, fallback);
-    }
-
-    if (w->event_handlers->tooltip != nullptr)
-    {
-        return w->event_handlers->tooltip(w, widgetIndex, fallback);
-    }
-
-    return { fallback, {} };
-}
-
-CursorID WindowEventCursorCall(WindowBase* w, WidgetIndex widgetIndex, const ScreenCoordsXY& screenCoords)
-{
-    CursorID cursorId = CursorID::Arrow;
-    if (w->event_handlers == nullptr)
-    {
-        cursorId = w->OnCursor(widgetIndex, screenCoords, cursorId);
-    }
-    else if (w->event_handlers->cursor != nullptr)
-        w->event_handlers->cursor(w, widgetIndex, screenCoords, &cursorId);
-    return cursorId;
-}
-
-void WindowEventMovedCall(WindowBase* w, const ScreenCoordsXY& screenCoords)
-{
-    if (w->event_handlers == nullptr)
-    {
-        w->OnMoved(screenCoords);
-    }
-    else if (w->event_handlers->moved != nullptr)
-        w->event_handlers->moved(w, screenCoords);
-}
-
-void WindowEventInvalidateCall(WindowBase* w)
-{
-    if (w->event_handlers == nullptr)
-        w->OnPrepareDraw();
-    else if (w->event_handlers->invalidate != nullptr)
-        w->event_handlers->invalidate(w);
-}
-
-void WindowEventPaintCall(WindowBase* w, DrawPixelInfo& dpi)
-{
-    if (w->event_handlers == nullptr)
-        w->OnDraw(dpi);
-    else if (w->event_handlers->paint != nullptr)
-        w->event_handlers->paint(w, dpi);
-}
-
-void WindowEventScrollPaintCall(WindowBase* w, DrawPixelInfo& dpi, int32_t scrollIndex)
-{
-    if (w->event_handlers == nullptr)
-        w->OnScrollDraw(scrollIndex, dpi);
-    else if (w->event_handlers->scroll_paint != nullptr)
-        w->event_handlers->scroll_paint(w, dpi, scrollIndex);
-}
-
-/**
- *
- *  rct2: 0x006ED710
- * Called after a window resize to move windows if they
- * are going to be out of sight.
- */
-void WindowRelocateWindows(int32_t width, int32_t height)
-{
-    int32_t new_location = 8;
-    WindowVisitEach([width, height, &new_location](WindowBase* w) {
-        // Work out if the window requires moving
-        if (w->windowPos.x + 10 < width)
-        {
-            if (w->flags & (WF_STICK_TO_BACK | WF_STICK_TO_FRONT))
-            {
-                if (w->windowPos.y - 22 < height)
-                {
-                    return;
-                }
-            }
-            if (w->windowPos.y + 10 < height)
-            {
-                return;
-            }
-        }
-
-        // Calculate the new locations
-        auto newWinPos = w->windowPos;
-        w->windowPos = { new_location, new_location + TOP_TOOLBAR_HEIGHT + 1 };
-
-        // Move the next new location so windows are not directly on top
-        new_location += 8;
-
-        // Adjust the viewport if required.
-        if (w->viewport != nullptr)
-        {
-            w->viewport->pos -= newWinPos - w->windowPos;
-        }
-    });
 }
 
 /**
@@ -1719,6 +1181,10 @@ void WindowResizeGui(int32_t width, int32_t height)
         titleWind->windowPos.y = height - 182;
     }
 
+    WindowBase* versionWind = WindowFindByClass(WindowClass::TitleVersion);
+    if (versionWind != nullptr)
+        versionWind->windowPos.y = height - 30;
+
     WindowBase* exitWind = WindowFindByClass(WindowClass::TitleExit);
     if (exitWind != nullptr)
     {
@@ -1730,6 +1196,22 @@ void WindowResizeGui(int32_t width, int32_t height)
     if (optionsWind != nullptr)
     {
         optionsWind->windowPos.x = width - 80;
+    }
+
+    // Keep options window centred after a resize
+    WindowBase* optionsWindow = WindowFindByClass(WindowClass::Options);
+    if (optionsWindow != nullptr)
+    {
+        optionsWindow->windowPos.x = (ContextGetWidth() - optionsWindow->width) / 2;
+        optionsWindow->windowPos.y = (ContextGetHeight() - optionsWindow->height) / 2;
+    }
+
+    // Keep progress bar window centred after a resize
+    WindowBase* ProgressWindow = WindowFindByClass(WindowClass::ProgressWindow);
+    if (ProgressWindow != nullptr)
+    {
+        ProgressWindow->windowPos.x = (ContextGetWidth() - ProgressWindow->width) / 2;
+        ProgressWindow->windowPos.y = (ContextGetHeight() - ProgressWindow->height) / 2;
     }
 
     GfxInvalidateScreen();
@@ -1789,7 +1271,7 @@ void WindowCloseConstructionWindows()
  */
 void WindowUpdateViewportRideMusic()
 {
-    OpenRCT2::RideAudio::ClearAllViewportInstances();
+    RideAudio::ClearAllViewportInstances();
     g_music_tracking_viewport = nullptr;
 
     for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
@@ -1803,164 +1285,13 @@ void WindowUpdateViewportRideMusic()
         gWindowAudioExclusive = w;
 
         if (viewport->zoom <= ZoomLevel{ 0 })
-            OpenRCT2::Audio::gVolumeAdjustZoom = 0;
+            Audio::gVolumeAdjustZoom = 0;
         else if (viewport->zoom == ZoomLevel{ 1 })
-            OpenRCT2::Audio::gVolumeAdjustZoom = 30;
+            Audio::gVolumeAdjustZoom = 30;
         else
-            OpenRCT2::Audio::gVolumeAdjustZoom = 60;
+            Audio::gVolumeAdjustZoom = 60;
         break;
     }
-}
-
-static void window_snap_left(WindowBase& w, int32_t proximity)
-{
-    const auto* mainWindow = WindowGetMain();
-    auto wBottom = w.windowPos.y + w.height;
-    auto wLeftProximity = w.windowPos.x - (proximity * 2);
-    auto wRightProximity = w.windowPos.x + (proximity * 2);
-    auto rightMost = INT32_MIN;
-
-    WindowVisitEach([&](WindowBase* w2) {
-        if (w2 == &w || w2 == mainWindow)
-            return;
-
-        auto right = w2->windowPos.x + w2->width;
-
-        if (wBottom < w2->windowPos.y || w.windowPos.y > w2->windowPos.y + w2->height)
-            return;
-
-        if (right < wLeftProximity || right > wRightProximity)
-            return;
-
-        rightMost = std::max(rightMost, right);
-    });
-
-    if (0 >= wLeftProximity && 0 <= wRightProximity)
-        rightMost = std::max(rightMost, 0);
-
-    if (rightMost != INT32_MIN)
-        w.windowPos.x = rightMost;
-}
-
-static void window_snap_top(WindowBase& w, int32_t proximity)
-{
-    const auto* mainWindow = WindowGetMain();
-    auto wRight = w.windowPos.x + w.width;
-    auto wTopProximity = w.windowPos.y - (proximity * 2);
-    auto wBottomProximity = w.windowPos.y + (proximity * 2);
-    auto bottomMost = INT32_MIN;
-
-    WindowVisitEach([&](WindowBase* w2) {
-        if (w2 == &w || w2 == mainWindow)
-            return;
-
-        auto bottom = w2->windowPos.y + w2->height;
-
-        if (wRight < w2->windowPos.x || w.windowPos.x > w2->windowPos.x + w2->width)
-            return;
-
-        if (bottom < wTopProximity || bottom > wBottomProximity)
-            return;
-
-        bottomMost = std::max(bottomMost, bottom);
-    });
-
-    if (0 >= wTopProximity && 0 <= wBottomProximity)
-        bottomMost = std::max(bottomMost, 0);
-
-    if (bottomMost != INT32_MIN)
-        w.windowPos.y = bottomMost;
-}
-
-static void window_snap_right(WindowBase& w, int32_t proximity)
-{
-    const auto* mainWindow = WindowGetMain();
-    auto wRight = w.windowPos.x + w.width;
-    auto wBottom = w.windowPos.y + w.height;
-    auto wLeftProximity = wRight - (proximity * 2);
-    auto wRightProximity = wRight + (proximity * 2);
-    auto leftMost = INT32_MAX;
-
-    WindowVisitEach([&](WindowBase* w2) {
-        if (w2 == &w || w2 == mainWindow)
-            return;
-
-        if (wBottom < w2->windowPos.y || w.windowPos.y > w2->windowPos.y + w2->height)
-            return;
-
-        if (w2->windowPos.x < wLeftProximity || w2->windowPos.x > wRightProximity)
-            return;
-
-        leftMost = std::min<int32_t>(leftMost, w2->windowPos.x);
-    });
-
-    auto screenWidth = ContextGetWidth();
-    if (screenWidth >= wLeftProximity && screenWidth <= wRightProximity)
-        leftMost = std::min(leftMost, screenWidth);
-
-    if (leftMost != INT32_MAX)
-        w.windowPos.x = leftMost - w.width;
-}
-
-static void window_snap_bottom(WindowBase& w, int32_t proximity)
-{
-    const auto* mainWindow = WindowGetMain();
-    auto wRight = w.windowPos.x + w.width;
-    auto wBottom = w.windowPos.y + w.height;
-    auto wTopProximity = wBottom - (proximity * 2);
-    auto wBottomProximity = wBottom + (proximity * 2);
-    auto topMost = INT32_MAX;
-
-    WindowVisitEach([&](WindowBase* w2) {
-        if (w2 == &w || w2 == mainWindow)
-            return;
-
-        if (wRight < w2->windowPos.x || w.windowPos.x > w2->windowPos.x + w2->width)
-            return;
-
-        if (w2->windowPos.y < wTopProximity || w2->windowPos.y > wBottomProximity)
-            return;
-
-        topMost = std::min<int32_t>(topMost, w2->windowPos.y);
-    });
-
-    auto screenHeight = ContextGetHeight();
-    if (screenHeight >= wTopProximity && screenHeight <= wBottomProximity)
-        topMost = std::min(topMost, screenHeight);
-
-    if (topMost != INT32_MAX)
-        w.windowPos.y = topMost - w.height;
-}
-
-void WindowMoveAndSnap(WindowBase& w, ScreenCoordsXY newWindowCoords, int32_t snapProximity)
-{
-    auto originalPos = w.windowPos;
-    int32_t minY = (gScreenFlags & SCREEN_FLAGS_TITLE_DEMO) ? 1 : TOP_TOOLBAR_HEIGHT + 2;
-
-    newWindowCoords.y = std::clamp(newWindowCoords.y, minY, ContextGetHeight() - 34);
-
-    if (snapProximity > 0)
-    {
-        w.windowPos = newWindowCoords;
-
-        window_snap_right(w, snapProximity);
-        window_snap_bottom(w, snapProximity);
-        window_snap_left(w, snapProximity);
-        window_snap_top(w, snapProximity);
-
-        if (w.windowPos == originalPos)
-            return;
-
-        newWindowCoords = w.windowPos;
-        w.windowPos = originalPos;
-    }
-
-    WindowSetPosition(w, newWindowCoords);
-}
-
-int32_t WindowCanResize(const WindowBase& w)
-{
-    return (w.flags & WF_RESIZABLE) && (w.min_width != w.max_width || w.min_height != w.max_height);
 }
 
 /**
@@ -1970,74 +1301,6 @@ int32_t WindowCanResize(const WindowBase& w)
 void TextinputCancel()
 {
     WindowCloseByClass(WindowClass::Textinput);
-}
-
-void WindowStartTextbox(
-    WindowBase& call_w, WidgetIndex call_widget, StringId existing_text, const char* existing_args, int32_t maxLength)
-{
-    if (gUsingWidgetTextBox)
-        WindowCancelTextbox();
-
-    gUsingWidgetTextBox = true;
-    gCurrentTextBox.window.classification = call_w.classification;
-    gCurrentTextBox.window.number = call_w.number;
-    gCurrentTextBox.widget_index = call_widget;
-    gTextBoxFrameNo = 0;
-
-    WindowCloseByClass(WindowClass::Textinput);
-
-    // Clear the text input buffer
-    gTextBoxInput.clear();
-
-    // Enter in the text input buffer any existing
-    // text.
-    if (existing_text != STR_NONE)
-    {
-        char tempBuf[TEXT_INPUT_SIZE]{};
-        size_t len = OpenRCT2::FormatStringLegacy(tempBuf, TEXT_INPUT_SIZE, existing_text, &existing_args);
-        gTextBoxInput.assign(tempBuf, len);
-    }
-
-    gTextInput = ContextStartTextInput(gTextBoxInput, maxLength);
-}
-
-void WindowCancelTextbox()
-{
-    if (gUsingWidgetTextBox)
-    {
-        WindowBase* w = WindowFindByNumber(gCurrentTextBox.window.classification, gCurrentTextBox.window.number);
-        if (w != nullptr)
-        {
-            WindowEventTextinputCall(w, gCurrentTextBox.widget_index, nullptr);
-        }
-        gCurrentTextBox.window.classification = WindowClass::Null;
-        gCurrentTextBox.window.number = 0;
-        ContextStopTextInput();
-        gUsingWidgetTextBox = false;
-        if (w != nullptr)
-        {
-            WidgetInvalidate(*w, gCurrentTextBox.widget_index);
-        }
-        gCurrentTextBox.widget_index = static_cast<uint16_t>(WindowWidgetType::Last);
-    }
-}
-
-void WindowUpdateTextboxCaret()
-{
-    gTextBoxFrameNo++;
-    if (gTextBoxFrameNo > 30)
-        gTextBoxFrameNo = 0;
-}
-
-void WindowUpdateTextbox()
-{
-    if (gUsingWidgetTextBox)
-    {
-        gTextBoxFrameNo = 0;
-        WindowBase* w = WindowFindByNumber(gCurrentTextBox.window.classification, gCurrentTextBox.window.number);
-        WidgetInvalidate(*w, gCurrentTextBox.widget_index);
-        WindowEventTextinputCall(w, gCurrentTextBox.widget_index, gTextBoxInput.c_str());
-    }
 }
 
 bool WindowIsVisible(WindowBase& w)
@@ -2062,6 +1325,8 @@ bool WindowIsVisible(WindowBase& w)
     for (auto it = std::next(itPos); it != g_window_list.end(); it++)
     {
         auto& w_other = *(*it);
+        if (w_other.flags & WF_DEAD)
+            continue;
 
         // if covered by a higher window, no rendering needed
         if (w_other.windowPos.x <= w.windowPos.x && w_other.windowPos.y <= w.windowPos.y
@@ -2108,6 +1373,8 @@ Viewport* WindowGetPreviousViewport(Viewport* current)
     for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
     {
         auto& w = **it;
+        if (w.flags & WF_DEAD)
+            continue;
         if (w.viewport != nullptr)
         {
             if (foundPrevious)
@@ -2162,114 +1429,4 @@ Viewport* WindowGetViewport(WindowBase* w)
     }
 
     return w->viewport;
-}
-
-WindowBase* WindowGetListening()
-{
-    for (auto it = g_window_list.rbegin(); it != g_window_list.rend(); it++)
-    {
-        auto& w = **it;
-        auto viewport = w.viewport;
-        if (viewport != nullptr)
-        {
-            if (viewport->flags & VIEWPORT_FLAG_SOUND_ON)
-            {
-                return &w;
-            }
-        }
-    }
-    return nullptr;
-}
-
-WindowClass WindowGetClassification(const WindowBase& window)
-{
-    return window.classification;
-}
-
-/**
- *
- *  rct2: 0x006EAF26
- */
-void WidgetScrollUpdateThumbs(WindowBase& w, WidgetIndex widget_index)
-{
-    const auto& widget = w.widgets[widget_index];
-    auto& scroll = w.scrolls[WindowGetScrollDataIndex(w, widget_index)];
-
-    if (scroll.flags & HSCROLLBAR_VISIBLE)
-    {
-        int32_t view_size = widget.width() - 21;
-        if (scroll.flags & VSCROLLBAR_VISIBLE)
-            view_size -= 11;
-        int32_t x = scroll.h_left * view_size;
-        if (scroll.h_right != 0)
-            x /= scroll.h_right;
-        scroll.h_thumb_left = x + 11;
-
-        x = widget.width() - 2;
-        if (scroll.flags & VSCROLLBAR_VISIBLE)
-            x -= 11;
-        x += scroll.h_left;
-        if (scroll.h_right != 0)
-            x = (x * view_size) / scroll.h_right;
-        x += 11;
-        view_size += 10;
-        scroll.h_thumb_right = std::min(x, view_size);
-
-        if (scroll.h_thumb_right - scroll.h_thumb_left < 20)
-        {
-            double barPosition = (scroll.h_thumb_right * 1.0) / view_size;
-
-            scroll.h_thumb_left = static_cast<int32_t>(std::lround(scroll.h_thumb_left - (20 * barPosition)));
-            scroll.h_thumb_right = static_cast<int32_t>(std::lround(scroll.h_thumb_right + (20 * (1 - barPosition))));
-        }
-    }
-
-    if (scroll.flags & VSCROLLBAR_VISIBLE)
-    {
-        int32_t view_size = widget.height() - 21;
-        if (scroll.flags & HSCROLLBAR_VISIBLE)
-            view_size -= 11;
-        int32_t y = scroll.v_top * view_size;
-        if (scroll.v_bottom != 0)
-            y /= scroll.v_bottom;
-        scroll.v_thumb_top = y + 11;
-
-        y = widget.height() - 2;
-        if (scroll.flags & HSCROLLBAR_VISIBLE)
-            y -= 11;
-        y += scroll.v_top;
-        if (scroll.v_bottom != 0)
-            y = (y * view_size) / scroll.v_bottom;
-        y += 11;
-        view_size += 10;
-        scroll.v_thumb_bottom = std::min(y, view_size);
-
-        if (scroll.v_thumb_bottom - scroll.v_thumb_top < 20)
-        {
-            double barPosition = (scroll.v_thumb_bottom * 1.0) / view_size;
-
-            scroll.v_thumb_top = static_cast<int32_t>(std::lround(scroll.v_thumb_top - (20 * barPosition)));
-            scroll.v_thumb_bottom = static_cast<int32_t>(std::lround(scroll.v_thumb_bottom + (20 * (1 - barPosition))));
-        }
-    }
-}
-
-void WindowBase::ResizeFrame()
-{
-    // Frame
-    widgets[0].right = width - 1;
-    widgets[0].bottom = height - 1;
-    // Title
-    widgets[1].right = width - 2;
-    // Close button
-    widgets[2].left = width - 13;
-    widgets[2].right = width - 3;
-}
-
-void WindowBase::ResizeFrameWithPage()
-{
-    ResizeFrame();
-    // Page background
-    widgets[3].right = width - 1;
-    widgets[3].bottom = height - 1;
 }

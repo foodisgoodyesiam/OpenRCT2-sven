@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,10 +12,13 @@
 #    include "ScriptEngine.h"
 
 #    include "../PlatformEnvironment.h"
+#    include "../actions/BannerPlaceAction.h"
 #    include "../actions/CustomAction.h"
 #    include "../actions/GameAction.h"
+#    include "../actions/LargeSceneryPlaceAction.h"
 #    include "../actions/RideCreateAction.h"
 #    include "../actions/StaffHireNewAction.h"
+#    include "../actions/WallPlaceAction.h"
 #    include "../config/Config.h"
 #    include "../core/EnumMap.hpp"
 #    include "../core/File.h"
@@ -27,6 +30,7 @@
 #    include "bindings/entity/ScEntity.hpp"
 #    include "bindings/entity/ScGuest.hpp"
 #    include "bindings/entity/ScLitter.hpp"
+#    include "bindings/entity/ScParticle.hpp"
 #    include "bindings/entity/ScPeep.hpp"
 #    include "bindings/entity/ScStaff.hpp"
 #    include "bindings/entity/ScVehicle.hpp"
@@ -34,12 +38,15 @@
 #    include "bindings/game/ScConsole.hpp"
 #    include "bindings/game/ScContext.hpp"
 #    include "bindings/game/ScDisposable.hpp"
+#    include "bindings/game/ScPlugin.hpp"
 #    include "bindings/game/ScProfiler.hpp"
 #    include "bindings/network/ScNetwork.hpp"
 #    include "bindings/network/ScPlayer.hpp"
 #    include "bindings/network/ScPlayerGroup.hpp"
 #    include "bindings/network/ScSocket.hpp"
+#    include "bindings/object/ScInstalledObject.hpp"
 #    include "bindings/object/ScObject.hpp"
+#    include "bindings/object/ScObjectManager.h"
 #    include "bindings/ride/ScRide.hpp"
 #    include "bindings/ride/ScRideStation.hpp"
 #    include "bindings/world/ScClimate.hpp"
@@ -52,6 +59,7 @@
 #    include "bindings/world/ScTile.hpp"
 #    include "bindings/world/ScTileElement.hpp"
 
+#    include <cassert>
 #    include <iostream>
 #    include <memory>
 #    include <stdexcept>
@@ -403,8 +411,16 @@ void ScriptEngine::Initialise()
     ScDisposable::Register(ctx);
     ScMap::Register(ctx);
     ScNetwork::Register(ctx);
+    ScObjectManager::Register(ctx);
+    ScInstalledObject::Register(ctx);
     ScObject::Register(ctx);
+    ScSceneryObject::Register(ctx);
     ScSmallSceneryObject::Register(ctx);
+    ScLargeSceneryObject::Register(ctx);
+    ScWallObject::Register(ctx);
+    ScFootpathAdditionObject::Register(ctx);
+    ScBannerObject::Register(ctx);
+    ScSceneryGroupObject::Register(ctx);
     ScPark::Register(ctx);
     ScParkMessage::Register(ctx);
     ScPlayer::Register(ctx);
@@ -422,6 +438,7 @@ void ScriptEngine::Initialise()
     ScEntity::Register(ctx);
     ScLitter::Register(ctx);
     ScVehicle::Register(ctx);
+    ScCrashedVehicleParticle::Register(ctx);
     ScPeep::Register(ctx);
     ScGuest::Register(ctx);
     ScThought::Register(ctx);
@@ -433,6 +450,10 @@ void ScriptEngine::Initialise()
     ScScenarioObjective::Register(ctx);
     ScPatrolArea::Register(ctx);
     ScStaff::Register(ctx);
+    ScHandyman::Register(ctx);
+    ScMechanic::Register(ctx);
+    ScSecurity::Register(ctx);
+    ScPlugin::Register(ctx);
 
     dukglue_register_global(ctx, std::make_shared<ScCheats>(), "cheats");
     dukglue_register_global(ctx, std::make_shared<ScClimate>(), "climate");
@@ -442,8 +463,10 @@ void ScriptEngine::Initialise()
     dukglue_register_global(ctx, std::make_shared<ScMap>(ctx), "map");
     dukglue_register_global(ctx, std::make_shared<ScNetwork>(ctx), "network");
     dukglue_register_global(ctx, std::make_shared<ScPark>(ctx), "park");
+    dukglue_register_global(ctx, std::make_shared<ScPlugin>(), "pluginManager");
     dukglue_register_global(ctx, std::make_shared<ScProfiler>(ctx), "profiler");
     dukglue_register_global(ctx, std::make_shared<ScScenario>(), "scenario");
+    dukglue_register_global(ctx, std::make_shared<ScObjectManager>(), "objectManager");
 
     RegisterConstants();
 
@@ -507,18 +530,18 @@ void ScriptEngine::RegisterConstants()
 {
     ConstantBuilder builder(_context);
     builder.Namespace("TrackSlope")
-        .Constant("None", TRACK_SLOPE_NONE)
-        .Constant("Up25", TRACK_SLOPE_UP_25)
-        .Constant("Up60", TRACK_SLOPE_UP_60)
-        .Constant("Down25", TRACK_SLOPE_DOWN_25)
-        .Constant("Down60", TRACK_SLOPE_DOWN_60)
-        .Constant("Up90", TRACK_SLOPE_UP_90)
-        .Constant("Down90", TRACK_SLOPE_DOWN_90);
+        .Constant("None", EnumValue(TrackPitch::None))
+        .Constant("Up25", EnumValue(TrackPitch::Up25))
+        .Constant("Up60", EnumValue(TrackPitch::Up60))
+        .Constant("Down25", EnumValue(TrackPitch::Down25))
+        .Constant("Down60", EnumValue(TrackPitch::Down60))
+        .Constant("Up90", EnumValue(TrackPitch::Up90))
+        .Constant("Down90", EnumValue(TrackPitch::Down90));
     builder.Namespace("TrackBanking")
-        .Constant("None", TRACK_BANK_NONE)
-        .Constant("BankLeft", TRACK_BANK_LEFT)
-        .Constant("BankRight", TRACK_BANK_RIGHT)
-        .Constant("UpsideDown", TRACK_BANK_UPSIDE_DOWN);
+        .Constant("None", EnumValue(TrackRoll::None))
+        .Constant("BankLeft", EnumValue(TrackRoll::Left))
+        .Constant("BankRight", EnumValue(TrackRoll::Right))
+        .Constant("UpsideDown", EnumValue(TrackRoll::UpsideDown));
 }
 
 void ScriptEngine::RefreshPlugins()
@@ -558,7 +581,7 @@ void ScriptEngine::RefreshPlugins()
     }
 
     // Turn on hot reload if not already enabled
-    if (!_hotReloadingInitialised && gConfigPlugin.EnableHotReloading && NetworkGetMode() == NETWORK_MODE_NONE)
+    if (!_hotReloadingInitialised && Config::Get().plugin.EnableHotReloading && NetworkGetMode() == NETWORK_MODE_NONE)
     {
         SetupHotReloading();
     }
@@ -894,6 +917,11 @@ bool ScriptEngine::ShouldStartPlugin(const std::shared_ptr<Plugin>& plugin)
 
 void ScriptEngine::Tick()
 {
+    if (!_initialised)
+    {
+        return;
+    }
+
     PROFILED_FUNCTION();
 
     CheckAndStartPlugins();
@@ -1058,7 +1086,7 @@ GameActions::Result ScriptEngine::QueryOrExecuteCustomGameAction(const CustomAct
         }
 
         std::vector<DukValue> pluginCallArgs;
-        if (GetTargetAPIVersion() <= API_VERSION_68_CUSTOM_ACTION_ARGS)
+        if (customActionInfo.Owner->GetTargetAPIVersion() <= API_VERSION_68_CUSTOM_ACTION_ARGS)
         {
             pluginCallArgs = { *dukArgs };
         }
@@ -1091,25 +1119,34 @@ GameActions::Result ScriptEngine::QueryOrExecuteCustomGameAction(const CustomAct
     auto action = GameActions::Result();
     action.Error = GameActions::Status::Unknown;
     action.ErrorTitle = "Unknown custom action";
+    action.ErrorMessage = customAction.GetPluginName() + ": " + actionz;
     return action;
 }
 
 GameActions::Result ScriptEngine::DukToGameActionResult(const DukValue& d)
 {
     auto result = GameActions::Result();
-    result.Error = static_cast<GameActions::Status>(AsOrDefault<int32_t>(d["error"]));
-    result.ErrorTitle = AsOrDefault<std::string>(d["errorTitle"]);
-    result.ErrorMessage = AsOrDefault<std::string>(d["errorMessage"]);
-    result.Cost = AsOrDefault<int32_t>(d["cost"]);
-
-    auto expenditureType = AsOrDefault<std::string>(d["expenditureType"]);
-    if (!expenditureType.empty())
+    if (d.type() == DUK_TYPE_OBJECT)
     {
-        auto expenditure = StringToExpenditureType(expenditureType);
-        if (expenditure != ExpenditureType::Count)
+        result.Error = static_cast<GameActions::Status>(AsOrDefault<int32_t>(d["error"]));
+        result.ErrorTitle = AsOrDefault<std::string>(d["errorTitle"]);
+        result.ErrorMessage = AsOrDefault<std::string>(d["errorMessage"]);
+        result.Cost = AsOrDefault<int32_t>(d["cost"]);
+        auto expenditureType = AsOrDefault<std::string>(d["expenditureType"]);
+        if (!expenditureType.empty())
         {
-            result.Expenditure = expenditure;
+            auto expenditure = StringToExpenditureType(expenditureType);
+            if (expenditure != ExpenditureType::Count)
+            {
+                result.Expenditure = expenditure;
+            }
         }
+    }
+    else
+    {
+        result.Error = GameActions::Status::Unknown;
+        result.ErrorTitle = "Unknown";
+        result.ErrorMessage = "Unknown";
     }
     return result;
 }
@@ -1163,7 +1200,7 @@ DukValue ScriptEngine::GameActionResultToDuk(const GameAction& action, const Gam
         obj.Set("errorMessage", result.GetErrorMessage());
     }
 
-    if (result.Cost != MONEY64_UNDEFINED)
+    if (result.Cost != kMoney64Undefined)
     {
         obj.Set("cost", result.Cost);
     }
@@ -1196,6 +1233,26 @@ DukValue ScriptEngine::GameActionResultToDuk(const GameAction& action, const Gam
                 obj.Set("peep", actionResult.StaffEntityId.ToUnderlying());
             }
         }
+    }
+    // BannerPlaceAction, LargeSceneryPlaceAction, WallPlaceAction
+    auto bannerId = BannerIndex::GetNull();
+    switch (action.GetType())
+    {
+        case GameCommand::PlaceBanner:
+            bannerId = result.GetData<BannerPlaceActionResult>().bannerId;
+            break;
+        case GameCommand::PlaceLargeScenery:
+            bannerId = result.GetData<LargeSceneryPlaceActionResult>().bannerId;
+            break;
+        case GameCommand::PlaceWall:
+            bannerId = result.GetData<WallPlaceActionResult>().BannerId;
+            break;
+        default:
+            break;
+    }
+    if (!bannerId.IsNull())
+    {
+        obj.Set("bannerIndex", bannerId.ToUnderlying());
     }
 
     return obj.Take();
@@ -1306,6 +1363,7 @@ const static EnumMap<GameCommand> ActionNameToType = {
     { "footpathremove", GameCommand::RemovePath },
     { "footpathadditionplace", GameCommand::PlaceFootpathAddition },
     { "footpathadditionremove", GameCommand::RemoveFootpathAddition },
+    { "gamesetspeed", GameCommand::SetGameSpeed },
     { "guestsetflags", GameCommand::GuestSetFlags },
     { "guestsetname", GameCommand::SetGuestName },
     { "landbuyrights", GameCommand::BuyLandRights },
@@ -1466,7 +1524,8 @@ void ScriptEngine::RunGameActionHooks(const GameAction& action, GameActions::Res
     }
 }
 
-std::unique_ptr<GameAction> ScriptEngine::CreateGameAction(const std::string& actionid, const DukValue& args)
+std::unique_ptr<GameAction> ScriptEngine::CreateGameAction(
+    const std::string& actionid, const DukValue& args, const std::string& pluginName)
 {
     auto action = CreateGameActionFromActionId(actionid);
     if (action != nullptr)
@@ -1494,7 +1553,7 @@ std::unique_ptr<GameAction> ScriptEngine::CreateGameAction(const std::string& ac
     auto jsonz = duk_json_encode(ctx, -1);
     auto json = std::string(jsonz);
     duk_pop(ctx);
-    auto customAction = std::make_unique<CustomAction>(actionid, json);
+    auto customAction = std::make_unique<CustomAction>(actionid, json, pluginName);
 
     if (customAction->GetPlayer() == -1 && NetworkGetMode() != NETWORK_MODE_NONE)
     {
@@ -1575,44 +1634,44 @@ void ScriptEngine::SetParkStorageFromJSON(std::string_view value)
 
 IntervalHandle ScriptEngine::AllocateHandle()
 {
-    for (size_t i = 0; i < _intervals.size(); i++)
-    {
-        if (!_intervals[i].IsValid())
-        {
-            return static_cast<IntervalHandle>(i + 1);
-        }
-    }
-    _intervals.emplace_back();
-    return static_cast<IntervalHandle>(_intervals.size());
+    const auto nextHandle = _nextIntervalHandle;
+
+    // In case of overflow start from 1 again
+    _nextIntervalHandle = std::max(_nextIntervalHandle + 1u, 1u);
+
+    return nextHandle;
 }
 
 IntervalHandle ScriptEngine::AddInterval(const std::shared_ptr<Plugin>& plugin, int32_t delay, bool repeat, DukValue&& callback)
 {
     auto handle = AllocateHandle();
-    if (handle != 0)
-    {
-        auto& interval = _intervals[static_cast<size_t>(handle) - 1];
-        interval.Owner = plugin;
-        interval.Handle = handle;
-        interval.Delay = delay;
-        interval.LastTimestamp = _lastIntervalTimestamp;
-        interval.Callback = std::move(callback);
-        interval.Repeat = repeat;
-    }
+    assert(handle != 0);
+
+    auto& interval = _intervals[handle];
+    interval.Owner = plugin;
+    interval.Delay = delay;
+    interval.LastTimestamp = _lastIntervalTimestamp;
+    interval.Callback = std::move(callback);
+    interval.Repeat = repeat;
+
     return handle;
 }
 
 void ScriptEngine::RemoveInterval(const std::shared_ptr<Plugin>& plugin, IntervalHandle handle)
 {
-    if (handle > 0 && static_cast<size_t>(handle) <= _intervals.size())
-    {
-        auto& interval = _intervals[static_cast<size_t>(handle) - 1];
+    if (handle == 0)
+        return;
 
-        // Only allow owner or REPL (nullptr) to remove intervals
-        if (plugin == nullptr || interval.Owner == plugin)
-        {
-            interval = {};
-        }
+    auto it = _intervals.find(handle);
+    if (it == _intervals.end())
+        return;
+
+    auto& interval = it->second;
+
+    // Only allow owner or REPL (nullptr) to remove intervals
+    if (plugin == nullptr || interval.Owner == plugin)
+    {
+        interval.Deleted = true;
     }
 }
 
@@ -1623,41 +1682,68 @@ void ScriptEngine::UpdateIntervals()
     {
         // timestamp has wrapped, subtract all intervals by the remaining amount before wrap
         auto delta = static_cast<int64_t>(std::numeric_limits<uint32_t>::max() - _lastIntervalTimestamp);
-        for (auto& interval : _intervals)
+        for (auto& entry : _intervals)
         {
-            if (interval.IsValid())
-            {
-                interval.LastTimestamp = -delta;
-            }
+            auto& interval = entry.second;
+            interval.LastTimestamp = -delta;
         }
     }
     _lastIntervalTimestamp = timestamp;
 
-    for (auto& interval : _intervals)
+    // Erase all intervals marked as deleted.
+    for (auto it = _intervals.begin(); it != _intervals.end();)
     {
-        if (interval.IsValid())
-        {
-            if (timestamp >= interval.LastTimestamp + interval.Delay)
-            {
-                ExecutePluginCall(interval.Owner, interval.Callback, {}, false);
+        auto& interval = it->second;
 
-                interval.LastTimestamp = timestamp;
-                if (!interval.Repeat)
-                {
-                    RemoveInterval(nullptr, interval.Handle);
-                }
-            }
+        if (interval.Deleted)
+        {
+            it = _intervals.erase(it);
+        }
+        else
+        {
+            it++;
+        }
+    }
+
+    // Execute all intervals that are due.
+    for (auto it = _intervals.begin(); it != _intervals.end(); it++)
+    {
+        auto& interval = it->second;
+
+        if (timestamp < interval.LastTimestamp + interval.Delay)
+        {
+            continue;
+        }
+
+        if (interval.Deleted)
+        {
+            // There is a chance that in one of the callbacks it deletes another interval.
+            continue;
+        }
+
+        ExecutePluginCall(interval.Owner, interval.Callback, {}, false);
+
+        interval.LastTimestamp = timestamp;
+        if (!interval.Repeat)
+        {
+            interval.Deleted = true;
         }
     }
 }
 
 void ScriptEngine::RemoveIntervals(const std::shared_ptr<Plugin>& plugin)
 {
-    for (auto& interval : _intervals)
+    for (auto it = _intervals.begin(); it != _intervals.end();)
     {
+        auto& interval = it->second;
+
         if (interval.Owner == plugin)
         {
-            interval = {};
+            it = _intervals.erase(it);
+        }
+        else
+        {
+            it++;
         }
     }
 }

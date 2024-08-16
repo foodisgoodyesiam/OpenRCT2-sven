@@ -2,6 +2,7 @@
 
 #include "../Cheats.h"
 #include "../Game.h"
+#include "../GameState.h"
 #include "../core/DataSerialiser.h"
 #include "../localisation/StringIds.h"
 #include "../paint/Paint.h"
@@ -10,6 +11,8 @@
 #include "../world/Map.h"
 #include "EntityList.h"
 #include "EntityRegistry.h"
+
+using namespace OpenRCT2;
 
 template<> bool EntityBase::Is<Litter>() const
 {
@@ -46,7 +49,7 @@ static bool IsLocationLitterable(const CoordsXYZ& mapPos)
  */
 void Litter::Create(const CoordsXYZD& litterPos, Type type)
 {
-    if (gCheatsDisableLittering)
+    if (GetGameState().Cheats.DisableLittering)
         return;
 
     auto offsetLitterPos = litterPos
@@ -86,7 +89,7 @@ void Litter::Create(const CoordsXYZD& litterPos, Type type)
     litter->SpriteData.HeightMax = 3;
     litter->SubType = type;
     litter->MoveTo(offsetLitterPos);
-    litter->creationTick = gCurrentTicks;
+    litter->creationTick = GetGameState().CurrentTicks;
 }
 
 /**
@@ -137,7 +140,7 @@ StringId Litter::GetName() const
 
 uint32_t Litter::GetAge() const
 {
-    return gCurrentTicks - creationTick;
+    return GetGameState().CurrentTicks - creationTick;
 }
 
 void Litter::Serialise(DataSerialiser& stream)
@@ -155,7 +158,7 @@ struct LitterSprite
 };
 
 /** rct2: 0x0097EF6C */
-static constexpr const LitterSprite _litterSprites[] = {
+static constexpr LitterSprite _litterSprites[] = {
     { SPR_LITTER_SICK, 0x1 },
     { SPR_LITTER_SICK_ALT, 0x1 },
     { SPR_LITTER_EMPTY_CAN, 0x1 },

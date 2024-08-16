@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,8 @@
 #if defined(_WIN32) && defined(USE_FRIBIDI)
 #    include "RTL.h"
 
+#    include "../Diagnostic.h"
+
 #    include <string>
 
 extern "C" {
@@ -19,7 +21,7 @@ extern "C" {
 #    include <fribidi/fribidi.h>
 }
 
-static constexpr const uint16_t BufferLength = 1024;
+static constexpr uint16_t BufferLength = 1024;
 
 std::string FixRTL(std::string& input)
 {

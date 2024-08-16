@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include "../common.h"
 #include "../core/FileSystem.hpp"
 #include "../world/Climate.h"
 #include "../world/Location.hpp"
@@ -59,6 +58,5 @@ std::string ScreenshotDumpPNG32bpp(int32_t width, int32_t height, const void* pi
 
 void ScreenshotGiant();
 int32_t CommandLineForScreenshot(const char** argv, int32_t argc, ScreenshotOptions* options);
-int32_t CommandLineForGfxbench(const char** argv, int32_t argc);
 
 void CaptureImage(const CaptureOptions& options);

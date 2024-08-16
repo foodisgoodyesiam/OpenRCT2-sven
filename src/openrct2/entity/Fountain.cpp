@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,8 +10,9 @@
 #include "Fountain.h"
 
 #include "../Game.h"
+#include "../GameState.h"
 #include "../core/DataSerialiser.h"
-#include "../object/FootpathItemEntry.h"
+#include "../object/PathAdditionEntry.h"
 #include "../paint/Paint.h"
 #include "../profiling/Profiling.h"
 #include "../scenario/Scenario.h"
@@ -20,6 +21,8 @@
 #include "../world/Map.h"
 #include "../world/Scenery.h"
 #include "EntityRegistry.h"
+
+using namespace OpenRCT2;
 
 enum class PATTERN
 {
@@ -33,26 +36,26 @@ enum class PATTERN
     FAST_RANDOM_CHASERS,
 };
 
-static constexpr const std::array _fountainDirectionsNegative = {
-    CoordsXY{ -COORDS_XY_STEP, 0 },
-    CoordsXY{ -COORDS_XY_STEP, -COORDS_XY_STEP },
+static constexpr std::array _fountainDirectionsNegative = {
+    CoordsXY{ -kCoordsXYStep, 0 },
+    CoordsXY{ -kCoordsXYStep, -kCoordsXYStep },
     CoordsXY{ 0, 0 },
-    CoordsXY{ -COORDS_XY_STEP, 0 },
+    CoordsXY{ -kCoordsXYStep, 0 },
     CoordsXY{ 0, 0 },
-    CoordsXY{ 0, -COORDS_XY_STEP },
-    CoordsXY{ 0, -COORDS_XY_STEP },
-    CoordsXY{ -COORDS_XY_STEP, -COORDS_XY_STEP },
+    CoordsXY{ 0, -kCoordsXYStep },
+    CoordsXY{ 0, -kCoordsXYStep },
+    CoordsXY{ -kCoordsXYStep, -kCoordsXYStep },
 };
 
-static constexpr const std::array _fountainDirectionsPositive = {
-    CoordsXY{ COORDS_XY_STEP, 0 },
+static constexpr std::array _fountainDirectionsPositive = {
+    CoordsXY{ kCoordsXYStep, 0 },
     CoordsXY{ 0, 0 },
-    CoordsXY{ 0, COORDS_XY_STEP },
-    CoordsXY{ COORDS_XY_STEP, COORDS_XY_STEP },
-    CoordsXY{ COORDS_XY_STEP, COORDS_XY_STEP },
-    CoordsXY{ COORDS_XY_STEP, 0 },
+    CoordsXY{ 0, kCoordsXYStep },
+    CoordsXY{ kCoordsXYStep, kCoordsXYStep },
+    CoordsXY{ kCoordsXYStep, kCoordsXYStep },
+    CoordsXY{ kCoordsXYStep, 0 },
     CoordsXY{ 0, 0 },
-    CoordsXY{ 0, COORDS_XY_STEP },
+    CoordsXY{ 0, kCoordsXYStep },
 };
 constexpr auto _FountainChanceOfStoppingEdgeMode = 0x3333;   // 0.200
 constexpr auto _FountainChanceOfStoppingRandomMode = 0x2000; // 0.125
@@ -86,16 +89,18 @@ template<> bool EntityBase::Is<JumpingFountain>() const
 
 void JumpingFountain::StartAnimation(const JumpingFountainType newType, const CoordsXY& newLoc, const TileElement* tileElement)
 {
+    const auto currentTicks = GetGameState().CurrentTicks;
+
     int32_t randomIndex;
     auto newZ = tileElement->GetBaseZ();
 
     // Change pattern approximately every 51 seconds
-    uint32_t pattern = (gCurrentTicks >> 11) & 7;
+    uint32_t pattern = (currentTicks >> 11) & 7;
     switch (static_cast<PATTERN>(pattern))
     {
         case PATTERN::CYCLIC_SQUARES:
             // 0, 1, 2, 3
-            for (int32_t i = 0; i < NumOrthogonalDirections; i++)
+            for (int32_t i = 0; i < kNumOrthogonalDirections; i++)
             {
                 JumpingFountain::Create(
                     newType, { newLoc + _fountainDirectionsPositive[i], newZ }, _fountainDirections[i],
@@ -105,7 +110,7 @@ void JumpingFountain::StartAnimation(const JumpingFountainType newType, const Co
         case PATTERN::BOUNCING_PAIRS:
             // random [0, 2 or 1, 3]
             randomIndex = ScenarioRand() & 1;
-            for (int32_t i = randomIndex; i < NumOrthogonalDirections; i += 2)
+            for (int32_t i = randomIndex; i < kNumOrthogonalDirections; i += 2)
             {
                 JumpingFountain::Create(
                     newType, { newLoc + _fountainDirectionsPositive[i], newZ }, _fountainDirections[i],
@@ -249,8 +254,8 @@ void JumpingFountain::AdvanceAnimation()
 
 bool JumpingFountain::IsJumpingFountain(const JumpingFountainType newType, const CoordsXYZ& newLoc)
 {
-    const int32_t pathBitFlagMask = newType == JumpingFountainType::Snow ? PATH_BIT_FLAG_JUMPING_FOUNTAIN_SNOW
-                                                                         : PATH_BIT_FLAG_JUMPING_FOUNTAIN_WATER;
+    const int32_t pathAdditionFlagMask = newType == JumpingFountainType::Snow ? PATH_ADDITION_FLAG_JUMPING_FOUNTAIN_SNOW
+                                                                              : PATH_ADDITION_FLAG_JUMPING_FOUNTAIN_WATER;
 
     TileElement* tileElement = MapGetFirstElementAt(newLoc);
     if (tileElement == nullptr)
@@ -266,8 +271,8 @@ bool JumpingFountain::IsJumpingFountain(const JumpingFountainType newType, const
         if (!tileElement->AsPath()->HasAddition())
             continue;
 
-        auto* pathBitEntry = tileElement->AsPath()->GetAdditionEntry();
-        if (pathBitEntry != nullptr && pathBitEntry->flags & pathBitFlagMask)
+        auto* pathAdditionEntry = tileElement->AsPath()->GetAdditionEntry();
+        if (pathAdditionEntry != nullptr && pathAdditionEntry->flags & pathAdditionFlagMask)
         {
             return true;
         }
@@ -430,11 +435,11 @@ void JumpingFountain::Paint(PaintSession& session, int32_t imageDirection) const
                                                                        : JumpingFountainWaterBaseImage;
     auto imageId = ImageId(baseImageId + imageDirection * 16 + frame);
     constexpr std::array antiClockWiseBoundingBoxes = {
-        CoordsXY{ -COORDS_XY_STEP, -3 },
+        CoordsXY{ -kCoordsXYStep, -3 },
         CoordsXY{ 0, -3 },
     };
     constexpr std::array clockWiseBoundingBoxes = {
-        CoordsXY{ -COORDS_XY_STEP, 3 },
+        CoordsXY{ -kCoordsXYStep, 3 },
         CoordsXY{ 0, 3 },
     };
 

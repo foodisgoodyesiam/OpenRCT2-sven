@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,18 +12,20 @@
 #include "../core/String.hpp"
 #include "CommandLine.hpp"
 
+using namespace OpenRCT2;
+
 #define SZ_DEFAULT "default"
 #define SZ_CLOSEST "closest"
 #define SZ_DITHERING "dithering"
 
-using ImportMode = OpenRCT2::Drawing::ImageImporter::ImportMode;
+using ImportMode = OpenRCT2::Drawing::ImportMode;
 
 ImportMode gSpriteMode = ImportMode::Default;
 
 static const char* _mode;
 
 // clang-format off
-static constexpr const CommandLineOptionDefinition SpriteOptions[]
+static constexpr CommandLineOptionDefinition SpriteOptions[]
 {
     { CMDLINE_TYPE_STRING, &_mode, 'm', "mode", "the type of sprite conversion <" SZ_DEFAULT "|" SZ_CLOSEST "|" SZ_DITHERING ">" },
     OptionTableEnd
@@ -49,9 +51,9 @@ const CommandLineCommand CommandLine::SpriteCommands[]
 
 static exitcode_t HandleSprite(CommandLineArgEnumerator* argEnumerator)
 {
-    if (String::Equals(_mode, SZ_CLOSEST, true))
+    if (String::IEquals(_mode, SZ_CLOSEST))
         gSpriteMode = ImportMode::Closest;
-    else if (String::Equals(_mode, SZ_DITHERING, true))
+    else if (String::IEquals(_mode, SZ_DITHERING))
         gSpriteMode = ImportMode::Dithering;
     Memory::Free(_mode);
 

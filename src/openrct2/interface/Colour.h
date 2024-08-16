@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,10 +9,12 @@
 
 #pragma once
 
-#include "../common.h"
+#include "../core/String.hpp"
 
+#include <cstdint>
 #include <string_view>
 
+using colour_t = uint8_t;
 using PaletteIndex = uint8_t;
 
 /**
@@ -21,64 +23,64 @@ using PaletteIndex = uint8_t;
 enum : colour_t
 {
     // Original Colours
-    COLOUR_BLACK,
-    COLOUR_GREY,
-    COLOUR_WHITE,
-    COLOUR_DARK_PURPLE,
-    COLOUR_LIGHT_PURPLE,
-    COLOUR_BRIGHT_PURPLE,
-    COLOUR_DARK_BLUE,
-    COLOUR_LIGHT_BLUE,
-    COLOUR_ICY_BLUE,
-    COLOUR_TEAL,
-    COLOUR_AQUAMARINE,
-    COLOUR_SATURATED_GREEN,
-    COLOUR_DARK_GREEN,
-    COLOUR_MOSS_GREEN,
-    COLOUR_BRIGHT_GREEN,
-    COLOUR_OLIVE_GREEN,
-    COLOUR_DARK_OLIVE_GREEN,
-    COLOUR_BRIGHT_YELLOW,
-    COLOUR_YELLOW,
-    COLOUR_DARK_YELLOW,
-    COLOUR_LIGHT_ORANGE,
-    COLOUR_DARK_ORANGE,
-    COLOUR_LIGHT_BROWN,
-    COLOUR_SATURATED_BROWN,
-    COLOUR_DARK_BROWN,
-    COLOUR_SALMON_PINK,
-    COLOUR_BORDEAUX_RED,
-    COLOUR_SATURATED_RED,
-    COLOUR_BRIGHT_RED,
-    COLOUR_DARK_PINK,
-    COLOUR_BRIGHT_PINK,
-    COLOUR_LIGHT_PINK,
+    COLOUR_BLACK,            // Black
+    COLOUR_GREY,             // Grey
+    COLOUR_WHITE,            // White
+    COLOUR_DARK_PURPLE,      // Dark purple
+    COLOUR_LIGHT_PURPLE,     // Light purple
+    COLOUR_BRIGHT_PURPLE,    // Bright purple
+    COLOUR_DARK_BLUE,        // Dark blue
+    COLOUR_LIGHT_BLUE,       // Light blue
+    COLOUR_ICY_BLUE,         // Icy blue
+    COLOUR_TEAL,             // Dark water
+    COLOUR_AQUAMARINE,       // Light water
+    COLOUR_SATURATED_GREEN,  // Saturated green
+    COLOUR_DARK_GREEN,       // Dark green
+    COLOUR_MOSS_GREEN,       // Moss green
+    COLOUR_BRIGHT_GREEN,     // Bright green
+    COLOUR_OLIVE_GREEN,      // Olive green
+    COLOUR_DARK_OLIVE_GREEN, // Dark olive green
+    COLOUR_BRIGHT_YELLOW,    // Bright yellow
+    COLOUR_YELLOW,           // Yellow
+    COLOUR_DARK_YELLOW,      // Dark yellow
+    COLOUR_LIGHT_ORANGE,     // Light orange
+    COLOUR_DARK_ORANGE,      // Dark orange
+    COLOUR_LIGHT_BROWN,      // Light brown
+    COLOUR_SATURATED_BROWN,  // Saturated brown
+    COLOUR_DARK_BROWN,       // Dark brown
+    COLOUR_SALMON_PINK,      // Salmon pink
+    COLOUR_BORDEAUX_RED,     // Bordeaux red
+    COLOUR_SATURATED_RED,    // Saturated red
+    COLOUR_BRIGHT_RED,       // Bright red
+    COLOUR_DARK_PINK,        // Dark pink
+    COLOUR_BRIGHT_PINK,      // Bright pink
+    COLOUR_LIGHT_PINK,       // Light pink
 
     // Extended Colour Set
-    COLOUR_DARK_OLIVE_DARK,
-    COLOUR_DARK_OLIVE_LIGHT,
-    COLOUR_SATURATED_BROWN_LIGHT,
-    COLOUR_BORDEAUX_RED_DARK,
-    COLOUR_BORDEAUX_RED_LIGHT,
-    COLOUR_GRASS_GREEN_DARK,
-    COLOUR_GRASS_GREEN_LIGHT,
-    COLOUR_OLIVE_DARK,
-    COLOUR_OLIVE_LIGHT,
-    COLOUR_SATURATED_GREEN_LIGHT,
-    COLOUR_TAN_DARK,
-    COLOUR_TAN_LIGHT,
-    COLOUR_DULL_PURPLE_LIGHT,
-    COLOUR_DULL_GREEN_DARK,
-    COLOUR_DULL_GREEN_LIGHT,
-    COLOUR_SATURATED_PURPLE_DARK,
-    COLOUR_SATURATED_PURPLE_LIGHT,
-    COLOUR_ORANGE_LIGHT,
-    COLOUR_AQUA_DARK,
-    COLOUR_MAGENTA_LIGHT,
-    COLOUR_DULL_BROWN_DARK,
-    COLOUR_DULL_BROWN_LIGHT,
-    COLOUR_INVISIBLE,
-    COLOUR_VOID,
+    COLOUR_DARK_OLIVE_DARK,        // Army green
+    COLOUR_DARK_OLIVE_LIGHT,       // Honeydew
+    COLOUR_SATURATED_BROWN_LIGHT,  // Tan
+    COLOUR_BORDEAUX_RED_DARK,      // Maroon
+    COLOUR_BORDEAUX_RED_LIGHT,     // Coral pink
+    COLOUR_GRASS_GREEN_DARK,       // Forest green
+    COLOUR_GRASS_GREEN_LIGHT,      // Chartreuse
+    COLOUR_OLIVE_DARK,             // Hunter green
+    COLOUR_OLIVE_LIGHT,            // Celadon
+    COLOUR_SATURATED_GREEN_LIGHT,  // Lime green
+    COLOUR_TAN_DARK,               // Sepia
+    COLOUR_TAN_LIGHT,              // Peach
+    COLOUR_DULL_PURPLE_LIGHT,      // Periwinkle
+    COLOUR_DULL_GREEN_DARK,        // Viridian
+    COLOUR_DULL_GREEN_LIGHT,       // Seafoam green
+    COLOUR_SATURATED_PURPLE_DARK,  // Violet
+    COLOUR_SATURATED_PURPLE_LIGHT, // Lavender
+    COLOUR_ORANGE_LIGHT,           // Pastel orange
+    COLOUR_AQUA_DARK,              // Deep water
+    COLOUR_MAGENTA_LIGHT,          // Pastel pink
+    COLOUR_DULL_BROWN_DARK,        // Umber
+    COLOUR_DULL_BROWN_LIGHT,       // Beige
+    COLOUR_INVISIBLE,              // Invisible
+    COLOUR_VOID,                   // Void
 
     COLOUR_COUNT,
 
@@ -209,46 +211,63 @@ constexpr uint8_t PALETTE_LENGTH_ANIMATED = 16;
 constexpr uint8_t COLOUR_NUM_ORIGINAL = 32;
 constexpr uint8_t COLOUR_NUM_NORMAL = 54;
 
+static constexpr uint8_t kLegacyColourFlagTranslucent = (1 << 7);
+
 #define TEXT_COLOUR_254 (254)
 #define TEXT_COLOUR_255 (255)
 
-enum
+enum class ColourFlag : uint8_t
 {
-    COLOUR_FLAG_OUTLINE = (1 << 5),
-    COLOUR_FLAG_INSET = (1 << 6), // 64, 0x40
-    COLOUR_FLAG_TRANSLUCENT = (1 << 7),
-    COLOUR_FLAG_8 = (1 << 8)
+    translucent,
+    inset,
+    withOutline,
 };
 
-#define TRANSLUCENT(x) ((x) | static_cast<uint8_t>(COLOUR_FLAG_TRANSLUCENT))
-#define NOT_TRANSLUCENT(x) ((x) & ~static_cast<uint8_t>(COLOUR_FLAG_TRANSLUCENT))
-#define BASE_COLOUR(x) ((x)&0x1F)
+struct ColourWithFlags
+{
+    colour_t colour{};
+    uint8_t flags{};
+
+    bool hasFlag(ColourFlag flag) const;
+
+    void setFlag(ColourFlag flag, bool on);
+
+    ColourWithFlags withFlag(ColourFlag flag, bool on) const;
+
+    static ColourWithFlags fromLegacy(uint8_t legacy);
+
+    ColourWithFlags& operator=(colour_t rhs);
+};
 
 struct ColourShadeMap
 {
-    uint8_t colour_0;
-    uint8_t colour_1;
-    uint8_t darkest;
-    uint8_t darker;
-    uint8_t dark;
-    uint8_t mid_dark;
-    uint8_t mid_light;
-    uint8_t light;
-    uint8_t lighter;
-    uint8_t lightest;
-    uint8_t colour_10;
-    uint8_t colour_11;
+    PaletteIndex colour_0;
+    PaletteIndex colour_1;
+    PaletteIndex darkest;
+    PaletteIndex darker;
+    PaletteIndex dark;
+    PaletteIndex mid_dark;
+    PaletteIndex mid_light;
+    PaletteIndex light;
+    PaletteIndex lighter;
+    PaletteIndex lightest;
+    PaletteIndex colour_10;
+    PaletteIndex colour_11;
 };
 
 extern ColourShadeMap ColourMapA[COLOUR_COUNT];
 
 void ColoursInitMaps();
 
-namespace Colour
+namespace OpenRCT2::Colour
 {
     colour_t FromString(std::string_view s, colour_t defaultValue = COLOUR_BLACK);
-}
+    u8string ToString(colour_t colour);
+} // namespace OpenRCT2::Colour
 
 #ifndef NO_TTF
 uint8_t BlendColours(const uint8_t paletteIndex1, const uint8_t paletteIndex2);
 #endif
+
+typedef uint8_t BlendColourMapType[PALETTE_COUNT][PALETTE_COUNT];
+BlendColourMapType* GetBlendColourMap();

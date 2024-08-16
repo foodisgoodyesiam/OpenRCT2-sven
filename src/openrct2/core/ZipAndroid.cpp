@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,6 +9,7 @@
 
 #ifdef __ANDROID__
 
+#    include "../Diagnostic.h"
 #    include "../platform/Platform.h"
 #    include "IStream.hpp"
 #    include "MemoryStream.h"
@@ -121,21 +122,21 @@ public:
 
     void SetFileData(std::string_view path, std::vector<uint8_t>&& data) override
     {
-        STUB();
+        LOG_WARNING("Function %s at %s:%d is a stub.", __PRETTY_FUNCTION__, __FILE__, __LINE__);
     }
 
     void DeleteFile(std::string_view) override
     {
-        STUB();
+        LOG_WARNING("Function %s at %s:%d is a stub.", __PRETTY_FUNCTION__, __FILE__, __LINE__);
     }
 
     void RenameFile(std::string_view, std::string_view) override
     {
-        STUB();
+        LOG_WARNING("Function %s at %s:%d is a stub.", __PRETTY_FUNCTION__, __FILE__, __LINE__);
     }
 };
 
-namespace Zip
+namespace OpenRCT2::Zip
 {
     std::unique_ptr<IZipArchive> Open(std::string_view path, ZIP_ACCESS access)
     {
@@ -154,7 +155,7 @@ namespace Zip
         }
         return result;
     }
-} // namespace Zip
+} // namespace OpenRCT2::Zip
 
 extern "C" {
 JNIEXPORT jlong JNICALL Java_io_openrct2_ZipArchive_allocBytes(JNIEnv* env, jclass, jbyteArray input, jint numBytes);

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,6 +16,8 @@
 #include <string>
 #include <tuple>
 #include <utility>
+
+using namespace OpenRCT2;
 
 using TCase = std::tuple<std::string, std::string, std::string>;
 
@@ -168,6 +170,58 @@ TEST_F(StringTest, StrLogicalCmp)
     EXPECT_LT(StrLogicalCmp("a", "^"), 0);
     EXPECT_LT(StrLogicalCmp("!", "A"), 0);
     EXPECT_LT(StrLogicalCmp("!", "a"), 0);
+}
+
+TEST_F(StringTest, IEqualsU8String)
+{
+    EXPECT_TRUE(String::IEquals(u8string{ u8"" }, u8string{ u8"" }));
+    EXPECT_TRUE(String::IEquals(u8string{ u8"Test" }, u8string{ u8"Test" }));
+    EXPECT_TRUE(String::IEquals(u8string{ u8"TesT" }, u8string{ u8"Test" }));
+    EXPECT_TRUE(String::IEquals(u8string{ u8"TEsT" }, u8string{ u8"Test" }));
+
+    EXPECT_FALSE(String::IEquals(u8string{ u8"Test" }, u8string{ u8"Message" }));
+    EXPECT_FALSE(String::IEquals(u8string{ u8"Test" }, u8string{ u8"TestMessage" }));
+    EXPECT_FALSE(String::IEquals(u8string{ u8"" }, u8string{ u8"Test" }));
+    EXPECT_FALSE(String::IEquals(u8string{ u8"Test" }, u8string{ u8"" }));
+}
+
+TEST_F(StringTest, IEqualsU8StringView)
+{
+    EXPECT_TRUE(String::IEquals(u8string_view{ u8"" }, u8string_view{ u8"" }));
+    EXPECT_TRUE(String::IEquals(u8string_view{ u8"Test" }, u8string_view{ u8"Test" }));
+    EXPECT_TRUE(String::IEquals(u8string_view{ u8"TesT" }, u8string_view{ u8"Test" }));
+    EXPECT_TRUE(String::IEquals(u8string_view{ u8"TEsT" }, u8string_view{ u8"Test" }));
+
+    EXPECT_FALSE(String::IEquals(u8string_view{ u8"Test" }, u8string_view{ u8"Message" }));
+    EXPECT_FALSE(String::IEquals(u8string_view{ u8"Test" }, u8string_view{ u8"TestMessage" }));
+    EXPECT_FALSE(String::IEquals(u8string_view{ u8"" }, u8string_view{ u8"Test" }));
+    EXPECT_FALSE(String::IEquals(u8string_view{ u8"Test" }, u8string_view{ u8"" }));
+}
+
+TEST_F(StringTest, EqualsU8String)
+{
+    EXPECT_TRUE(String::Equals(u8string{ u8"" }, u8string{ u8"" }));
+    EXPECT_TRUE(String::Equals(u8string{ u8"Test" }, u8string{ u8"Test" }));
+
+    EXPECT_FALSE(String::Equals(u8string{ u8"TesT" }, u8string{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string{ u8"TEsT" }, u8string{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string{ u8"Test" }, u8string{ u8"Message" }));
+    EXPECT_FALSE(String::Equals(u8string{ u8"Test" }, u8string{ u8"TestMessage" }));
+    EXPECT_FALSE(String::Equals(u8string{ u8"" }, u8string{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string{ u8"Test" }, u8string{ u8"" }));
+}
+
+TEST_F(StringTest, EqualsU8StringView)
+{
+    EXPECT_TRUE(String::Equals(u8string_view{ u8"" }, u8string_view{ u8"" }));
+    EXPECT_TRUE(String::Equals(u8string_view{ u8"Test" }, u8string_view{ u8"Test" }));
+
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"TesT" }, u8string_view{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"TEsT" }, u8string_view{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"Test" }, u8string_view{ u8"Message" }));
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"Test" }, u8string_view{ u8"TestMessage" }));
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"" }, u8string_view{ u8"Test" }));
+    EXPECT_FALSE(String::Equals(u8string_view{ u8"Test" }, u8string_view{ u8"" }));
 }
 
 class CodepointViewTest : public testing::Test

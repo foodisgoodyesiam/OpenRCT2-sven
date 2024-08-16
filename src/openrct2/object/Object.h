@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include "../common.h"
 #include "../core/JsonFwd.hpp"
 #include "../core/String.hpp"
 #include "../util/Util.h"
@@ -26,11 +25,11 @@
 struct ObjectRepositoryItem;
 using ride_type_t = uint16_t;
 
-constexpr const size_t VersionNumFields = 3;
+constexpr size_t VersionNumFields = 3;
 using ObjectVersion = std::tuple<uint16_t, uint16_t, uint16_t>;
 static_assert(std::tuple_size<ObjectVersion>{} == VersionNumFields);
 
-namespace ObjectSelectionFlags
+namespace OpenRCT2::ObjectSelectionFlags
 {
     constexpr uint8_t Selected = (1 << 0);
     constexpr uint8_t InUse = (1 << 2);
@@ -38,9 +37,7 @@ namespace ObjectSelectionFlags
     constexpr uint8_t AlwaysRequired = (1 << 4);
     constexpr uint8_t Flag6 = (1 << 5);
     constexpr uint8_t AllFlags = 0xFF;
-}; // namespace ObjectSelectionFlags
-
-#define OBJECT_SELECTION_NOT_SELECTED_OR_REQUIRED 0
+}; // namespace OpenRCT2::ObjectSelectionFlags
 
 enum class ObjectSourceGame : uint8_t
 {
@@ -103,7 +100,7 @@ struct RCTObjectEntry
     bool operator==(const RCTObjectEntry& rhs) const;
     bool operator!=(const RCTObjectEntry& rhs) const;
 };
-assert_struct_size(RCTObjectEntry, 0x10);
+static_assert(sizeof(RCTObjectEntry) == 0x10);
 
 #pragma pack(pop)
 
@@ -139,9 +136,12 @@ struct ObjectEntryDescriptor
     bool HasValue() const;
     ObjectType GetType() const;
     std::string_view GetName() const;
+    std::string ToString() const;
 
     bool operator==(const ObjectEntryDescriptor& rhs) const;
     bool operator!=(const ObjectEntryDescriptor& rhs) const;
+
+    static ObjectEntryDescriptor Parse(std::string_view identifier);
 };
 
 struct IObjectRepository;
@@ -167,15 +167,15 @@ struct IReadObjectContext
 {
     virtual ~IReadObjectContext() = default;
 
-    virtual std::string_view GetObjectIdentifier() abstract;
-    virtual IObjectRepository& GetObjectRepository() abstract;
-    virtual bool ShouldLoadImages() abstract;
-    virtual std::vector<uint8_t> GetData(std::string_view path) abstract;
-    virtual ObjectAsset GetAsset(std::string_view path) abstract;
+    virtual std::string_view GetObjectIdentifier() = 0;
+    virtual IObjectRepository& GetObjectRepository() = 0;
+    virtual bool ShouldLoadImages() = 0;
+    virtual std::vector<uint8_t> GetData(std::string_view path) = 0;
+    virtual ObjectAsset GetAsset(std::string_view path) = 0;
 
-    virtual void LogVerbose(ObjectError code, const utf8* text) abstract;
-    virtual void LogWarning(ObjectError code, const utf8* text) abstract;
-    virtual void LogError(ObjectError code, const utf8* text) abstract;
+    virtual void LogVerbose(ObjectError code, const utf8* text) = 0;
+    virtual void LogWarning(ObjectError code, const utf8* text) = 0;
+    virtual void LogError(ObjectError code, const utf8* text) = 0;
 };
 
 #ifdef __WARN_SUGGEST_FINAL_TYPES__
@@ -220,7 +220,6 @@ protected:
      */
     void PopulateTablesFromJson(IReadObjectContext* context, json_t& root);
 
-    std::string GetOverrideString(uint8_t index) const;
     std::string GetString(ObjectStringID index) const;
     std::string GetString(int32_t language, ObjectStringID index) const;
 
@@ -265,7 +264,7 @@ public:
         return _usesFallbackImages;
     }
 
-    // Legacy data structures
+    // DONOT USE THIS CAN LEAD TO OBJECT COLLISIONS
     std::string_view GetLegacyIdentifier() const
     {
         return _descriptor.GetName();
@@ -285,8 +284,8 @@ public:
     {
     }
     virtual void ReadLegacy(IReadObjectContext* context, OpenRCT2::IStream* stream);
-    virtual void Load() abstract;
-    virtual void Unload() abstract;
+    virtual void Load() = 0;
+    virtual void Unload() = 0;
 
     virtual void DrawPreview(DrawPixelInfo& /*dpi*/, int32_t /*width*/, int32_t /*height*/) const
     {
@@ -339,9 +338,6 @@ public:
 #ifdef __WARN_SUGGEST_FINAL_TYPES__
 #    pragma GCC diagnostic pop
 #endif
-
-extern int32_t object_entry_group_counts[];
-extern int32_t object_entry_group_encoding[];
 
 int32_t ObjectCalculateChecksum(const RCTObjectEntry* entry, const void* data, size_t dataLength);
 void ObjectCreateIdentifierName(char* string_buffer, size_t size, const RCTObjectEntry* object);

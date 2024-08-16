@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,7 +10,7 @@
 #include "LanguagePack.h"
 
 #include "../Context.h"
-#include "../common.h"
+#include "../Diagnostic.h"
 #include "../core/FileStream.h"
 #include "../core/Memory.hpp"
 #include "../core/RTL.h"
@@ -18,30 +18,21 @@
 #include "../core/StringBuilder.h"
 #include "../core/StringReader.h"
 #include "Language.h"
-#include "Localisation.h"
 #include "LocalisationService.h"
+#include "StringIds.h"
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 
+using namespace OpenRCT2;
+
 // Don't try to load more than language files that exceed 64 MiB
 constexpr uint64_t MAX_LANGUAGE_SIZE = 64 * 1024 * 1024;
-constexpr uint64_t MAX_OBJECT_OVERRIDES = 4096;
 constexpr uint64_t MAX_SCENARIO_OVERRIDES = 4096;
-
-constexpr StringId ObjectOverrideBase = 0x6000;
-constexpr int32_t ObjectOverrideMaxStringCount = 3;
 
 constexpr StringId ScenarioOverrideBase = 0x7000;
 constexpr int32_t ScenarioOverrideMaxStringCount = 3;
-
-struct ObjectOverride
-{
-    char name[8] = { 0 };
-    std::string strings[ObjectOverrideMaxStringCount];
-};
 
 struct ScenarioOverride
 {
@@ -54,14 +45,12 @@ class LanguagePack final : public ILanguagePack
 private:
     uint16_t const _id;
     std::vector<std::string> _strings;
-    std::vector<ObjectOverride> _objectOverrides;
     std::vector<ScenarioOverride> _scenarioOverrides;
 
     ///////////////////////////////////////////////////////////////////////////
     // Parsing work data
     ///////////////////////////////////////////////////////////////////////////
     std::string _currentGroup;
-    ObjectOverride* _currentObjectOverride = nullptr;
     ScenarioOverride* _currentScenarioOverride = nullptr;
 
 public:
@@ -112,7 +101,6 @@ public:
 
         // Clean up the parsing work data
         _currentGroup.clear();
-        _currentObjectOverride = nullptr;
         _currentScenarioOverride = nullptr;
     }
 
@@ -159,48 +147,12 @@ public:
             return nullptr;
         }
 
-        if (stringId >= ObjectOverrideBase)
-        {
-            int32_t offset = stringId - ObjectOverrideBase;
-            int32_t ooIndex = offset / ObjectOverrideMaxStringCount;
-            int32_t ooStringIndex = offset % ObjectOverrideMaxStringCount;
-
-            if (_objectOverrides.size() > static_cast<size_t>(ooIndex)
-                && !_objectOverrides[ooIndex].strings[ooStringIndex].empty())
-            {
-                return _objectOverrides[ooIndex].strings[ooStringIndex].c_str();
-            }
-
-            return nullptr;
-        }
-
         if ((_strings.size() > static_cast<size_t>(stringId)) && !_strings[stringId].empty())
         {
             return _strings[stringId].c_str();
         }
 
         return nullptr;
-    }
-
-    StringId GetObjectOverrideStringId(std::string_view legacyIdentifier, uint8_t index) override
-    {
-        Guard::Assert(index < ObjectOverrideMaxStringCount);
-
-        int32_t ooIndex = 0;
-        for (const ObjectOverride& objectOverride : _objectOverrides)
-        {
-            if (std::string_view(objectOverride.name, 8) == legacyIdentifier)
-            {
-                if (objectOverride.strings[index].empty())
-                {
-                    return STR_NONE;
-                }
-                return ObjectOverrideBase + (ooIndex * ObjectOverrideMaxStringCount) + index;
-            }
-            ooIndex++;
-        }
-
-        return STR_NONE;
     }
 
     StringId GetScenarioOverrideStringId(const utf8* scenarioFilename, uint8_t index) override
@@ -211,7 +163,7 @@ public:
         int32_t ooIndex = 0;
         for (const ScenarioOverride& scenarioOverride : _scenarioOverrides)
         {
-            if (String::Equals(scenarioOverride.filename.c_str(), scenarioFilename, true))
+            if (String::IEquals(scenarioOverride.filename, scenarioFilename))
             {
                 if (scenarioOverride.strings[index].empty())
                 {
@@ -226,23 +178,11 @@ public:
     }
 
 private:
-    ObjectOverride* GetObjectOverride(const std::string& objectIdentifier)
-    {
-        for (auto& oo : _objectOverrides)
-        {
-            if (strncmp(oo.name, objectIdentifier.c_str(), 8) == 0)
-            {
-                return &oo;
-            }
-        }
-        return nullptr;
-    }
-
     ScenarioOverride* GetScenarioOverride(const std::string& scenarioIdentifier)
     {
         for (auto& so : _scenarioOverrides)
         {
-            if (String::Equals(so.strings[0], scenarioIdentifier.c_str(), true))
+            if (String::IEquals(so.strings[0], scenarioIdentifier))
             {
                 return &so;
             }
@@ -355,14 +295,13 @@ private:
 
     void ParseGroupObject(IStringReader* reader)
     {
-        auto sb = StringBuilder();
+        // THIS IS NO LONGER USED SO WE ARE JUST SKIPPING OVER
         codepoint_t codepoint;
 
         // Should have already deduced that the next codepoint is a [
         reader->Skip();
 
         // Read string up to ] or line end
-        bool closedCorrectly = false;
         while (reader->TryPeek(&codepoint))
         {
             if (IsNewLine(codepoint))
@@ -371,36 +310,10 @@ private:
             reader->Skip();
             if (codepoint == ']')
             {
-                closedCorrectly = true;
                 break;
             }
-            sb.Append(codepoint);
         }
-
-        if (closedCorrectly)
-        {
-            while (sb.GetLength() < 8)
-            {
-                sb.Append(' ');
-            }
-            if (sb.GetLength() == 8)
-            {
-                _currentGroup = sb.GetStdString();
-                _currentObjectOverride = GetObjectOverride(_currentGroup);
-                _currentScenarioOverride = nullptr;
-                if (_currentObjectOverride == nullptr)
-                {
-                    if (_objectOverrides.size() == MAX_OBJECT_OVERRIDES)
-                    {
-                        LOG_WARNING("Maximum number of localised object strings exceeded.");
-                    }
-
-                    _objectOverrides.emplace_back();
-                    _currentObjectOverride = &_objectOverrides[_objectOverrides.size() - 1];
-                    std::copy_n(_currentGroup.c_str(), 8, _currentObjectOverride->name);
-                }
-            }
-        }
+        _currentGroup.clear();
     }
 
     void ParseGroupScenario(IStringReader* reader)
@@ -430,7 +343,6 @@ private:
         if (closedCorrectly)
         {
             _currentGroup = sb.GetStdString();
-            _currentObjectOverride = nullptr;
             _currentScenarioOverride = GetScenarioOverride(_currentGroup);
             if (_currentScenarioOverride == nullptr)
             {
@@ -557,11 +469,7 @@ private:
         }
         else
         {
-            if (_currentObjectOverride != nullptr)
-            {
-                _currentObjectOverride->strings[stringId] = s;
-            }
-            else
+            if (_currentScenarioOverride != nullptr)
             {
                 _currentScenarioOverride->strings[stringId] = std::move(s);
             }
@@ -569,7 +477,7 @@ private:
     }
 };
 
-namespace LanguagePackFactory
+namespace OpenRCT2::LanguagePackFactory
 {
     std::unique_ptr<ILanguagePack> FromFile(uint16_t id, const utf8* path)
     {
@@ -588,4 +496,4 @@ namespace LanguagePackFactory
         auto languagePack = LanguagePack::FromText(id, text);
         return languagePack;
     }
-} // namespace LanguagePackFactory
+} // namespace OpenRCT2::LanguagePackFactory

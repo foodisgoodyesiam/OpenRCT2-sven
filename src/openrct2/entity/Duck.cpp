@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -9,9 +9,9 @@
 #include "Duck.h"
 
 #include "../Game.h"
+#include "../GameState.h"
 #include "../audio/audio.h"
 #include "../core/DataSerialiser.h"
-#include "../localisation/Date.h"
 #include "../paint/Paint.h"
 #include "../profiling/Profiling.h"
 #include "../scenario/Scenario.h"
@@ -19,14 +19,15 @@
 #include "../world/Surface.h"
 #include "EntityRegistry.h"
 
-#include <algorithm>
 #include <iterator>
 #include <limits>
 
-constexpr const int32_t DUCK_MAX_STATES = 5;
+using namespace OpenRCT2;
+
+constexpr int32_t DUCK_MAX_STATES = 5;
 
 // clang-format off
-static constexpr const CoordsXY DuckMoveOffset[] =
+static constexpr CoordsXY DuckMoveOffset[] =
 {
     { -1,  0 },
     {  0,  1 },
@@ -34,28 +35,28 @@ static constexpr const CoordsXY DuckMoveOffset[] =
     {  0, -1 },
 };
 
-static constexpr const uint8_t DuckAnimationFlyToWater[] =
+static constexpr uint8_t DuckAnimationFlyToWater[] =
 {
     8, 9, 10, 11, 12, 13
 };
 
-static constexpr const uint8_t DuckAnimationSwim[] =
+static constexpr uint8_t DuckAnimationSwim[] =
 {
     0
 };
 
-static constexpr const uint8_t DuckAnimationDrink[] =
+static constexpr uint8_t DuckAnimationDrink[] =
 {
     1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0xFF
 };
 
-static constexpr const uint8_t DuckAnimationDoubleDrink[] =
+static constexpr uint8_t DuckAnimationDoubleDrink[] =
 {
     4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 6,
     6, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 0, 0, 0, 0, 0xFF
 };
 
-static constexpr const uint8_t DuckAnimationFlyAway[] =
+static constexpr uint8_t DuckAnimationFlyAway[] =
 {
     8, 9, 10, 11, 12, 13
 };
@@ -88,7 +89,9 @@ void Duck::Remove()
 
 void Duck::UpdateFlyToWater()
 {
-    if ((gCurrentTicks & 3) != 0)
+    const auto currentTicks = GetGameState().CurrentTicks;
+
+    if ((currentTicks & 3) != 0)
         return;
 
     frame++;
@@ -150,7 +153,9 @@ void Duck::UpdateFlyToWater()
 
 void Duck::UpdateSwim()
 {
-    if (((gCurrentTicks + Id.ToUnderlying()) & 3) != 0)
+    const auto currentTicks = GetGameState().CurrentTicks;
+
+    if (((currentTicks + Id.ToUnderlying()) & 3) != 0)
         return;
 
     uint32_t randomNumber = ScenarioRand();
@@ -246,7 +251,7 @@ void Duck::UpdateDoubleDrink()
 
 void Duck::UpdateFlyAway()
 {
-    if ((gCurrentTicks & 3) == 0)
+    if ((GetGameState().CurrentTicks & 3) == 0)
     {
         frame++;
         if (frame >= std::size(DuckAnimationFlyAway))

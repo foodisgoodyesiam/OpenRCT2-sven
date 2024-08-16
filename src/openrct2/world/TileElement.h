@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,7 +10,6 @@
 #pragma once
 
 #include "../Identifiers.h"
-#include "../common.h"
 #include "../ride/RideTypes.h"
 #include "../ride/Station.h"
 #include "Banner.h"
@@ -22,7 +21,7 @@ struct CoordsXY;
 struct LargeSceneryEntry;
 struct SmallSceneryEntry;
 struct WallSceneryEntry;
-struct PathBitEntry;
+struct PathAdditionEntry;
 struct BannerSceneryEntry;
 struct FootpathEntry;
 class LargeSceneryObject;
@@ -31,10 +30,11 @@ class TerrainEdgeObject;
 class FootpathObject;
 class FootpathSurfaceObject;
 class FootpathRailingsObject;
+enum class RideColourScheme : uint8_t;
 using track_type_t = uint16_t;
 
-constexpr const uint8_t MAX_ELEMENT_HEIGHT = 255;
-constexpr const uint8_t OWNER_MASK = 0b00001111;
+constexpr uint8_t MAX_ELEMENT_HEIGHT = 255;
+constexpr uint8_t OWNER_MASK = 0b00001111;
 
 #pragma pack(push, 1)
 
@@ -183,7 +183,7 @@ struct TileElement : public TileElementBase
     void RemoveBannerEntry();
     BannerIndex GetBannerIndex() const;
 };
-assert_struct_size(TileElement, 16);
+static_assert(sizeof(TileElement) == 16);
 
 struct SurfaceElement : TileElementBase
 {
@@ -195,7 +195,7 @@ private:
     uint8_t GrassLength;
     uint8_t Ownership;
     uint8_t SurfaceStyle;
-    uint8_t EdgeStyle;
+    uint8_t EdgeObjectIndex;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-private-field"
     uint8_t Pad0B[5];
@@ -205,12 +205,13 @@ public:
     uint8_t GetSlope() const;
     void SetSlope(uint8_t newSlope);
 
-    uint32_t GetSurfaceStyle() const;
-    TerrainSurfaceObject* GetSurfaceStyleObject() const;
-    void SetSurfaceStyle(uint32_t newStyle);
-    uint32_t GetEdgeStyle() const;
-    TerrainEdgeObject* GetEdgeStyleObject() const;
-    void SetEdgeStyle(uint32_t newStyle);
+    ObjectEntryIndex GetSurfaceObjectIndex() const;
+    TerrainSurfaceObject* GetSurfaceObject() const;
+    void SetSurfaceObjectIndex(ObjectEntryIndex newStyle);
+
+    ObjectEntryIndex GetEdgeObjectIndex() const;
+    TerrainEdgeObject* GetEdgeObject() const;
+    void SetEdgeObjectIndex(ObjectEntryIndex newStyle);
 
     bool CanGrassGrow() const;
     uint8_t GetGrassLength() const;
@@ -230,7 +231,7 @@ public:
     bool HasTrackThatNeedsWater() const;
     void SetHasTrackThatNeedsWater(bool on);
 };
-assert_struct_size(SurfaceElement, 16);
+static_assert(sizeof(SurfaceElement) == 16);
 
 struct PathElement : TileElementBase
 {
@@ -309,8 +310,9 @@ public:
     bool HasAddition() const;
     uint8_t GetAddition() const;
     ObjectEntryIndex GetAdditionEntryIndex() const;
-    const PathBitEntry* GetAdditionEntry() const;
+    const PathAdditionEntry* GetAdditionEntry() const;
     void SetAddition(uint8_t newAddition);
+    void SetAdditionEntryIndex(ObjectEntryIndex entryIndex);
 
     bool AdditionIsGhost() const;
     void SetAdditionIsGhost(bool isGhost);
@@ -323,7 +325,7 @@ public:
 
     bool IsLevelCrossing(const CoordsXY& coords) const;
 };
-assert_struct_size(PathElement, 16);
+static_assert(sizeof(PathElement) == 16);
 
 struct TrackElement : TileElementBase
 {
@@ -371,7 +373,7 @@ public:
     void SetRideIndex(RideId newRideIndex);
 
     uint8_t GetColourScheme() const;
-    void SetColourScheme(uint8_t newColourScheme);
+    void SetColourScheme(RideColourScheme newColourScheme);
 
     StationIndex GetStationIndex() const;
     void SetStationIndex(StationIndex newStationIndex);
@@ -424,7 +426,7 @@ public:
     bool IsStation() const;
     bool IsBlockStart() const;
 };
-assert_struct_size(TrackElement, 16);
+static_assert(sizeof(TrackElement) == 16);
 
 struct SmallSceneryElement : TileElementBase
 {
@@ -459,7 +461,7 @@ public:
     void SetNeedsSupports();
     void UpdateAge(const CoordsXY& sceneryPos);
 };
-assert_struct_size(SmallSceneryElement, 16);
+static_assert(sizeof(SmallSceneryElement) == 16);
 
 struct LargeSceneryElement : TileElementBase
 {
@@ -499,7 +501,7 @@ public:
     bool IsAccounted() const;
     void SetIsAccounted(bool isAccounted);
 };
-assert_struct_size(LargeSceneryElement, 16);
+static_assert(sizeof(LargeSceneryElement) == 16);
 
 struct WallElement : TileElementBase
 {
@@ -544,7 +546,7 @@ public:
     bool AnimationIsBackwards() const;
     void SetAnimationIsBackwards(bool isBackwards);
 };
-assert_struct_size(WallElement, 16);
+static_assert(sizeof(WallElement) == 16);
 
 struct EntranceElement : TileElementBase
 {
@@ -589,7 +591,7 @@ public:
 
     int32_t GetDirections() const;
 };
-assert_struct_size(EntranceElement, 16);
+static_assert(sizeof(EntranceElement) == 16);
 
 struct BannerElement : TileElementBase
 {
@@ -617,7 +619,7 @@ public:
     void SetAllowedEdges(uint8_t newEdges);
     void ResetAllowedEdges();
 };
-assert_struct_size(BannerElement, 16);
+static_assert(sizeof(BannerElement) == 16);
 
 #pragma pack(pop)
 
@@ -698,10 +700,10 @@ enum
     MAP_ELEM_TRACK_SEQUENCE_GREEN_LIGHT = (1 << 7),
 };
 
-#define TILE_ELEMENT_QUADRANT_MASK 0b11000000
-#define TILE_ELEMENT_TYPE_MASK 0b00111100
-#define TILE_ELEMENT_DIRECTION_MASK 0b00000011
-#define TILE_ELEMENT_OCCUPIED_QUADRANTS_MASK 0b00001111
+constexpr uint8_t kTileElementQuadrantMask = 0b11000000;
+constexpr uint8_t kTileElementTypeMask = 0b00111100;
+constexpr uint8_t kTileElementDirectionMask = 0b00000011;
+constexpr uint8_t kTileElementOccupiedQuadrantsMask = 0b00001111;
 
 enum
 {

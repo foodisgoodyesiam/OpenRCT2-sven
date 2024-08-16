@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -22,6 +22,7 @@
 #include <openrct2/world/Surface.h>
 
 using namespace OpenRCT2;
+using namespace OpenRCT2::Ui::Windows;
 
 // clang-format off
 static uint16_t toolSizeSpriteIndices[] =
@@ -38,16 +39,12 @@ static uint16_t toolSizeSpriteIndices[] =
 // clang-format on
 
 uint16_t gLandToolSize;
-money64 gLandToolRaiseCost;
-money64 gLandToolLowerCost;
 ObjectEntryIndex gLandToolTerrainSurface;
 ObjectEntryIndex gLandToolTerrainEdge;
-money64 gWaterToolRaiseCost;
-money64 gWaterToolLowerCost;
 
 uint32_t LandTool::SizeToSpriteIndex(uint16_t size)
 {
-    if (size <= MAX_TOOL_SIZE_WITH_SPRITE)
+    if (size <= kLandToolMaximumSizeWithSprite)
     {
         return toolSizeSpriteIndices[size];
     }
@@ -68,7 +65,7 @@ void LandTool::ShowSurfaceStyleDropdown(WindowBase* w, Widget* widget, ObjectEnt
         if (surfaceObj != nullptr && !surfaceObj->UsesFallbackImages())
         {
             auto imageId = ImageId(surfaceObj->IconImageId);
-            if (surfaceObj->Colour != 255)
+            if (surfaceObj->Colour != TerrainSurfaceObject::kNoValue)
                 imageId = imageId.WithPrimary(surfaceObj->Colour);
 
             gDropdownItems[itemIndex].Format = Dropdown::FormatLandPicker;

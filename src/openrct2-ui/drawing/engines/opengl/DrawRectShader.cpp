@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,8 @@
 #ifndef DISABLE_OPENGL
 
 #    include "DrawRectShader.h"
+
+using namespace OpenRCT2::Ui;
 
 namespace
 {
@@ -27,7 +29,7 @@ constexpr VDStruct VertexData[4] = {
     { 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f },
 };
 
-constexpr const size_t InitialInstancesBufferSize = 32768;
+constexpr size_t InitialInstancesBufferSize = 32768;
 
 DrawRectShader::DrawRectShader()
     : OpenGLShaderProgram("drawrect")

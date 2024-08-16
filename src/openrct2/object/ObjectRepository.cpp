@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,10 +10,9 @@
 #include "ObjectRepository.h"
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../OpenRCT2.h"
 #include "../PlatformEnvironment.h"
-#include "../common.h"
-#include "../config/Config.h"
 #include "../core/Console.hpp"
 #include "../core/DataSerialiser.h"
 #include "../core/FileIndex.hpp"
@@ -25,7 +24,6 @@
 #include "../core/Numerics.hpp"
 #include "../core/Path.hpp"
 #include "../core/String.hpp"
-#include "../localisation/Localisation.h"
 #include "../localisation/LocalisationService.h"
 #include "../object/Object.h"
 #include "../park/Legacy.h"
@@ -41,7 +39,6 @@
 #include "ObjectManager.h"
 #include "RideObject.h"
 
-#include <algorithm>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -101,11 +98,11 @@ public:
     {
         std::unique_ptr<Object> object;
         auto extension = Path::GetExtension(path);
-        if (String::Equals(extension, ".json", true))
+        if (String::IEquals(extension, ".json"))
         {
             object = ObjectFactory::CreateObjectFromJsonFile(_objectRepository, path, false);
         }
-        else if (String::Equals(extension, ".parkobj", true))
+        else if (String::IEquals(extension, ".parkobj"))
         {
             object = ObjectFactory::CreateObjectFromZipFile(_objectRepository, path, false);
         }
@@ -267,11 +264,11 @@ public:
         Guard::ArgumentNotNull(ori, GUARD_LINE);
 
         auto extension = Path::GetExtension(ori->Path);
-        if (String::Equals(extension, ".json", true))
+        if (String::IEquals(extension, ".json"))
         {
             return ObjectFactory::CreateObjectFromJsonFile(*this, ori->Path, !gOpenRCT2NoGraphics);
         }
-        if (String::Equals(extension, ".parkobj", true))
+        if (String::IEquals(extension, ".parkobj"))
         {
             return ObjectFactory::CreateObjectFromZipFile(*this, ori->Path, !gOpenRCT2NoGraphics);
         }
@@ -470,6 +467,13 @@ private:
         }
     }
 
+    // 0x0098DA2C
+    static constexpr std::array<int32_t, 11> kLegacyObjectEntryGroupEncoding = {
+        CHUNK_ENCODING_RLE, CHUNK_ENCODING_RLE, CHUNK_ENCODING_RLE,    CHUNK_ENCODING_RLE,
+        CHUNK_ENCODING_RLE, CHUNK_ENCODING_RLE, CHUNK_ENCODING_RLE,    CHUNK_ENCODING_RLE,
+        CHUNK_ENCODING_RLE, CHUNK_ENCODING_RLE, CHUNK_ENCODING_ROTATE,
+    };
+
     static void SaveObject(
         std::string_view path, const RCTObjectEntry* entry, const void* data, size_t dataSize, bool fixChecksum = true)
     {
@@ -525,7 +529,7 @@ private:
         // Encode data
         ObjectType objectType = entry->GetType();
         SawyerCodingChunkHeader chunkHeader;
-        chunkHeader.encoding = object_entry_group_encoding[EnumValue(objectType)];
+        chunkHeader.encoding = kLegacyObjectEntryGroupEncoding[EnumValue(objectType)];
         chunkHeader.length = static_cast<uint32_t>(dataSize);
         uint8_t* encodedDataBuffer = Memory::Allocate<uint8_t>(0x600000);
         size_t encodedDataSize = SawyerCodingWriteChunkBuffer(
@@ -688,22 +692,6 @@ std::unique_ptr<Object> ObjectRepositoryLoadObject(const RCTObjectEntry* objectE
         }
     }
     return object;
-}
-
-void ScenarioTranslate(ScenarioIndexEntry* scenarioEntry)
-{
-    StringId localisedStringIds[3];
-    if (LanguageGetLocalisedScenarioStrings(scenarioEntry->Name, localisedStringIds))
-    {
-        if (localisedStringIds[0] != STR_NONE)
-        {
-            String::Set(scenarioEntry->Name, sizeof(scenarioEntry->Name), LanguageGetString(localisedStringIds[0]));
-        }
-        if (localisedStringIds[2] != STR_NONE)
-        {
-            String::Set(scenarioEntry->Details, sizeof(scenarioEntry->Details), LanguageGetString(localisedStringIds[2]));
-        }
-    }
 }
 
 size_t ObjectRepositoryGetItemsCount()

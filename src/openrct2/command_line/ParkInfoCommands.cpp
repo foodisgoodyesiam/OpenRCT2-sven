@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2023 OpenRCT2 developers
+ * Copyright (c) 2014-2024 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,8 +16,10 @@
 #include "../object/ObjectRepository.h"
 #include "CommandLine.hpp"
 
+using namespace OpenRCT2;
+
 // clang-format off
-static constexpr const CommandLineOptionDefinition NoOptions[]
+static constexpr CommandLineOptionDefinition NoOptions[]
 {
     OptionTableEnd
 };
@@ -73,7 +75,7 @@ static exitcode_t HandleObjectsInfo(CommandLineArgEnumerator* argEnumerator)
     {
         parkImporter = ParkImporter::CreateParkFile(objectRepository);
     }
-    else if (info.Version <= FILE_TYPE_S4_CUTOFF)
+    else if (info.Version <= kFileTypeS4Cutoff)
     {
         // Save is an S4 (RCT1 format)
         parkImporter = ParkImporter::CreateS4();
@@ -104,7 +106,7 @@ static exitcode_t HandleObjectsInfo(CommandLineArgEnumerator* argEnumerator)
              ObjectType::Walls,
              ObjectType::Banners,
              ObjectType::Paths,
-             ObjectType::PathBits,
+             ObjectType::PathAdditions,
              ObjectType::SceneryGroup,
              ObjectType::ParkEntrance,
              ObjectType::Water,

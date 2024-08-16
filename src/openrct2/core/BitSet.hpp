@@ -87,18 +87,13 @@ namespace OpenRCT2
             static_assert(ComputeBlockSize<31>() == sizeof(uint32_t));
             static_assert(ComputeBlockSize<33>() == sizeof(uintptr_t));
 
-            // TODO: Replace with std::popcount when C++20 is enabled.
             template<typename T> static constexpr size_t popcount(const T val)
             {
-                size_t res = 0;
-                auto x = static_cast<std::make_unsigned_t<T>>(val);
-                while (x > 0u)
-                {
-                    if (x & 1u)
-                        res++;
-                    x >>= 1u;
-                }
-                return res;
+                // I bet this if statement makes no difference
+                if constexpr (sizeof(T)<=4)
+                    return __builtin_popcount(val);
+                else
+                    return __builtin_popcountll(val);
             }
 
             template<size_t TByteSize> struct StorageBlockType;

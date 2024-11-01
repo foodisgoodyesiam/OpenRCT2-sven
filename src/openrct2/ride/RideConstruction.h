@@ -10,6 +10,7 @@
 #pragma once
 
 #include "../Identifiers.h"
+#include "../core/FlagHolder.hpp"
 #include "../world/Location.hpp"
 #include "Station.h"
 #include "Track.h"
@@ -39,11 +40,25 @@ namespace OpenRCT2
         MazeMove,
         MazeFill
     };
-}
+
+    enum class AlternativeTrackFlag : uint8_t
+    {
+        alternativePieces, // Dinghy slide and Water Coaster
+        inverted,          // Flying RC, Lay-down RC, Multi-dimension RC
+    };
+    using SelectedAlternative = FlagHolder<uint8_t, AlternativeTrackFlag>;
+
+    enum class LiftHillAndInverted : uint8_t
+    {
+        liftHill,
+        inverted,
+    };
+    using SelectedLiftAndInverted = FlagHolder<uint32_t, LiftHillAndInverted>;
+} // namespace OpenRCT2
 
 extern money64 _currentTrackPrice;
 
-extern uint32_t _currentTrackCurve;
+extern TypeOrCurve _currentlySelectedTrack;
 extern OpenRCT2::RideConstructionState _rideConstructionState;
 extern RideId _currentRideIndex;
 
@@ -55,8 +70,8 @@ extern uint8_t _currentTrackSelectionFlags;
 extern uint32_t _rideConstructionNextArrowPulse;
 extern TrackPitch _currentTrackPitchEnd;
 extern TrackRoll _currentTrackRollEnd;
-extern uint8_t _currentTrackLiftHill;
-extern uint8_t _currentTrackAlternative;
+extern bool _currentTrackHasLiftHill;
+extern OpenRCT2::SelectedAlternative _currentTrackAlternative;
 extern track_type_t _selectedTrackType;
 
 extern TrackRoll _previousTrackRollEnd;
@@ -77,8 +92,6 @@ extern uint8_t gRideEntranceExitPlaceDirection;
 
 void RideEntranceExitPlaceProvisionalGhost();
 void RideEntranceExitRemoveGhost();
-void RideRestoreProvisionalTrackPiece();
-void RideRemoveProvisionalTrackPiece();
 
 void RideConstructionRemoveGhosts();
 
@@ -98,3 +111,5 @@ void RideConstructionStart(Ride& ride);
 
 TrackDrawerDescriptor getCurrentTrackDrawerDescriptor(const RideTypeDescriptor& rtd);
 TrackDrawerEntry getCurrentTrackDrawerEntry(const RideTypeDescriptor& rtd);
+track_type_t GetTrackTypeFromCurve(
+    TrackCurve curve, bool startsDiagonal, TrackPitch startSlope, TrackPitch endSlope, TrackRoll startBank, TrackRoll endBank);

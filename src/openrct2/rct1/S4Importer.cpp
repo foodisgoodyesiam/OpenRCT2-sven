@@ -47,10 +47,12 @@
 #include "../object/ObjectList.h"
 #include "../object/ObjectManager.h"
 #include "../object/ObjectRepository.h"
+#include "../park/Legacy.h"
 #include "../peep/PeepAnimationData.h"
 #include "../peep/RideUseSystem.h"
 #include "../rct12/CSStringConverter.h"
 #include "../rct12/EntryList.h"
+#include "../rct12/ScenarioPatcher.h"
 #include "../ride/RideData.h"
 #include "../ride/Station.h"
 #include "../ride/Track.h"
@@ -70,6 +72,7 @@
 #include "../world/Surface.h"
 #include "../world/TilePointerIndex.hpp"
 #include "../world/Wall.h"
+#include "../world/tile_element/EntranceElement.h"
 #include "RCT1.h"
 #include "Tables.h"
 
@@ -124,7 +127,7 @@ namespace OpenRCT2::RCT1
         ObjectEntryIndex _footpathRailingsTypeToEntryMap[4]{};
 
         // Research
-        BitSet<MAX_RIDE_OBJECTS> _researchRideEntryUsed{};
+        BitSet<kMaxRideObjects> _researchRideEntryUsed{};
         BitSet<EnumValue(RideType::Count)> _researchRideTypeUsed{};
 
         // Scenario repository - used for determining scenario name
@@ -178,23 +181,24 @@ namespace OpenRCT2::RCT1
         {
             Initialise(gameState);
 
-            CreateAvailableObjectMappings();
-
             ImportRides();
             ImportRideMeasurements();
             ImportEntities();
-            ImportTileElements();
-            ImportPeepSpawns();
+            ImportTileElements(gameState);
+            ImportPeepSpawns(gameState);
             ImportFinance(gameState);
             ImportResearch(gameState);
-            ImportParkName();
+            ImportParkName(gameState);
             ImportParkFlags(gameState);
             ImportClimate(gameState);
             ImportScenarioNameDetails(gameState);
             ImportScenarioObjective(gameState);
-            ImportSavedView();
-            FixLandOwnership();
-            FixUrbanPark();
+            ImportSavedView(gameState);
+
+            if (_isScenario)
+            {
+                RCT12::FetchAndApplyScenarioPatch(_s4Path);
+            }
             FixNextGuestNumber(gameState);
             CountBlockSections();
             SetDefaultNames();
@@ -325,7 +329,7 @@ namespace OpenRCT2::RCT1
 
             uint16_t mapSize = _s4.MapSize == 0 ? Limits::kMaxMapSize : _s4.MapSize;
 
-            gScenarioFileName = GetRCT1ScenarioName();
+            gameState.ScenarioFileName = GetRCT1ScenarioName();
 
             // Do map initialisation, same kind of stuff done when loading scenario editor
             gameStateInitAll(gameState, { mapSize, mapSize });
@@ -743,9 +747,9 @@ namespace OpenRCT2::RCT1
             else
             {
                 auto entryName = RCT1::GetSceneryGroupObject(sceneryThemeType);
-                if (_sceneryGroupEntries.GetCount() >= MAX_SCENERY_GROUP_OBJECTS)
+                if (_sceneryGroupEntries.GetCount() >= kMaxSceneryGroupObjects)
                 {
-                    Console::WriteLine("Warning: More than %d (max scenery groups) in RCT1 park.", MAX_SCENERY_GROUP_OBJECTS);
+                    Console::WriteLine("Warning: More than %d (max scenery groups) in RCT1 park.", kMaxSceneryGroupObjects);
                     std::string entryNameString = std::string(entryName);
                     Console::WriteLine("         [%s] scenery group not added.", entryNameString.c_str());
                 }
@@ -957,7 +961,7 @@ namespace OpenRCT2::RCT1
             dst->lift_hill_speed = 5;
 
             dst->music = OBJECT_ENTRY_INDEX_NULL;
-            if (GetRideTypeDescriptor(dst->type).HasFlag(RIDE_TYPE_FLAG_ALLOW_MUSIC))
+            if (GetRideTypeDescriptor(dst->type).HasFlag(RtdFlag::allowMusic))
             {
                 if (_gameVersion == FILE_VERSION_RCT1)
                 {
@@ -1119,7 +1123,7 @@ namespace OpenRCT2::RCT1
             }
 
             dst->entrance_style = OBJECT_ENTRY_INDEX_NULL;
-            if (dst->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_HAS_ENTRANCE_EXIT))
+            if (dst->GetRideTypeDescriptor().HasFlag(RtdFlag::hasEntranceAndExit))
             {
                 // Entrance styles were introduced with AA. They correspond directly with those in RCT2.
                 if (_gameVersion == FILE_VERSION_RCT1)
@@ -1296,16 +1300,16 @@ namespace OpenRCT2::RCT1
         void ImportPeep(::Peep* dst, const RCT1::Peep* src)
         {
             // Peep vs. staff (including which kind)
-            dst->SpriteType = RCT1::GetPeepSpriteType(src->SpriteType);
+            dst->AnimationGroup = RCT1::GetPeepAnimationGroup(src->AnimationGroup);
             dst->Action = static_cast<PeepActionType>(src->Action);
             dst->SpecialSprite = src->SpecialSprite;
-            dst->NextActionSpriteType = static_cast<PeepActionSpriteType>(src->NextActionSpriteType);
-            dst->ActionSpriteImageOffset = src->ActionSpriteImageOffset;
-            dst->WalkingFrameNum = src->NoActionFrameNum;
-            dst->ActionSpriteType = static_cast<PeepActionSpriteType>(src->ActionSpriteType);
-            dst->ActionFrame = src->ActionFrame;
+            dst->NextAnimationType = static_cast<PeepAnimationType>(src->NextAnimationType);
+            dst->AnimationImageIdOffset = src->AnimationImageIdOffset;
+            dst->WalkingAnimationFrameNum = src->NoActionFrameNum;
+            dst->AnimationType = static_cast<PeepAnimationType>(src->AnimationType);
+            dst->AnimationFrameNum = src->AnimationFrameNum;
 
-            const SpriteBounds* spriteBounds = &GetSpriteBounds(dst->SpriteType, dst->ActionSpriteType);
+            const SpriteBounds* spriteBounds = &GetSpriteBounds(dst->AnimationGroup, dst->AnimationType);
             dst->SpriteData.Width = spriteBounds->sprite_width;
             dst->SpriteData.HeightMin = spriteBounds->sprite_height_negative;
             dst->SpriteData.HeightMax = spriteBounds->sprite_height_positive;
@@ -1366,8 +1370,8 @@ namespace OpenRCT2::RCT1
             //                                          index in the array ----^     ^--- bit position in the 8-bit value
             // We do the opposite in this function to recover the x and y values.
 
-            int32_t peepOffset = staffId * Limits::PatrolAreaSize;
-            for (int32_t i = 0; i < Limits::PatrolAreaSize; i++)
+            int32_t peepOffset = staffId * Limits::kPatrolAreaSize;
+            for (int32_t i = 0; i < Limits::kPatrolAreaSize; i++)
             {
                 if (_s4.PatrolAreas[peepOffset + i] == 0)
                 {
@@ -1406,9 +1410,8 @@ namespace OpenRCT2::RCT1
             dst->z = src->z;
         }
 
-        void ImportPeepSpawns()
+        void ImportPeepSpawns(GameState_t& gameState)
         {
-            auto& gameState = GetGameState();
             gameState.PeepSpawns.clear();
             for (size_t i = 0; i < Limits::kMaxPeepSpawns; i++)
             {
@@ -1438,16 +1441,16 @@ namespace OpenRCT2::RCT1
             gameState.Park.Value = CorrectRCT1ParkValue(_s4.ParkValue);
             gameState.CurrentProfit = ToMoney64(_s4.Profit);
 
-            for (size_t i = 0; i < Limits::FinanceGraphSize; i++)
+            for (size_t i = 0; i < Limits::kFinanceGraphSize; i++)
             {
                 gameState.CashHistory[i] = ToMoney64(_s4.CashHistory[i]);
                 gameState.Park.ValueHistory[i] = CorrectRCT1ParkValue(_s4.ParkValueHistory[i]);
                 gameState.WeeklyProfitHistory[i] = ToMoney64(_s4.WeeklyProfitHistory[i]);
             }
 
-            for (size_t i = 0; i < Limits::ExpenditureTableMonthCount; i++)
+            for (size_t i = 0; i < Limits::kExpenditureTableMonthCount; i++)
             {
-                for (size_t j = 0; j < Limits::ExpenditureTypeCount; j++)
+                for (size_t j = 0; j < Limits::kExpenditureTypeCount; j++)
                 {
                     gameState.ExpenditureTable[i][j] = ToMoney64(_s4.Expenditure[i][j]);
                 }
@@ -1482,21 +1485,6 @@ namespace OpenRCT2::RCT1
             }
         }
 
-        void AppendRequiredObjects(ObjectList& objectList, ObjectType objectType, const RCT12::EntryList& entryList)
-        {
-            AppendRequiredObjects(objectList, objectType, entryList.GetEntries());
-        }
-
-        void AppendRequiredObjects(ObjectList& objectList, ObjectType objectType, const std::vector<std::string>& objectNames)
-        {
-            for (const auto& objectName : objectNames)
-            {
-                auto descriptor = ObjectEntryDescriptor(objectName);
-                descriptor.Type = objectType;
-                objectList.Add(descriptor);
-            }
-        }
-
         ObjectList GetRequiredObjects()
         {
             ObjectList result;
@@ -1514,11 +1502,12 @@ namespace OpenRCT2::RCT1
             AppendRequiredObjects(result, ObjectType::TerrainEdge, _terrainEdgeEntries);
             AppendRequiredObjects(result, ObjectType::FootpathSurface, _footpathSurfaceEntries);
             AppendRequiredObjects(result, ObjectType::FootpathRailings, _footpathRailingsEntries);
+            AppendRequiredObjects(result, ObjectType::PeepNames, std::vector<std::string>({ "rct2.peep_names.original" }));
             RCT12AddDefaultObjects(result);
             return result;
         }
 
-        void ImportTileElements()
+        void ImportTileElements(GameState_t& gameState)
         {
             // Build tile pointer cache (needed to get the first element at a certain location)
             auto tilePointerIndex = TilePointerIndex<RCT12TileElement>(
@@ -1537,7 +1526,7 @@ namespace OpenRCT2::RCT1
                         RCT12TileElement* srcElement = tilePointerIndex.GetFirstElementAt(coords);
                         do
                         {
-                            if (srcElement->BaseHeight == Limits::MaxElementHeight)
+                            if (srcElement->BaseHeight == Limits::kMaxElementHeight)
                                 continue;
 
                             // Reserve 8 elements for import
@@ -1566,8 +1555,8 @@ namespace OpenRCT2::RCT1
                 }
             }
 
-            SetTileElements(std::move(tileElements));
-            FixEntrancePositions();
+            SetTileElements(gameState, std::move(tileElements));
+            FixEntrancePositions(gameState);
         }
 
         size_t ImportTileElement(TileElement* dst, const RCT12TileElement* src)
@@ -2122,7 +2111,7 @@ namespace OpenRCT2::RCT1
             }
         }
 
-        void ImportParkName()
+        void ImportParkName(GameState_t& gameState)
         {
             std::string parkName = std::string(_s4.ScenarioName);
             if (IsUserStringID(static_cast<StringId>(_s4.ParkNameStringIndex)))
@@ -2134,7 +2123,7 @@ namespace OpenRCT2::RCT1
                 }
             }
 
-            auto& park = GetGameState().Park;
+            auto& park = gameState.Park;
             park.Name = std::move(parkName);
         }
 
@@ -2149,7 +2138,13 @@ namespace OpenRCT2::RCT1
             gameState.Park.Rating = _s4.ParkRating;
 
             Park::ResetHistories(gameState);
-            std::copy(std::begin(_s4.ParkRatingHistory), std::end(_s4.ParkRatingHistory), gameState.Park.RatingHistory);
+            for (size_t i = 0; i < std::size(_s4.ParkRatingHistory); i++)
+            {
+                if (_s4.ParkRatingHistory[i] != RCT12ParkHistoryUndefined)
+                {
+                    gameState.Park.RatingHistory[i] = _s4.ParkRatingHistory[i] * RCT12ParkRatingHistoryFactor;
+                }
+            }
             for (size_t i = 0; i < std::size(_s4.GuestsInParkHistory); i++)
             {
                 if (_s4.GuestsInParkHistory[i] != RCT12ParkHistoryUndefined)
@@ -2372,9 +2367,8 @@ namespace OpenRCT2::RCT1
                 gameState.ScenarioObjective.RideId = GetBuildTheBestRideId();
         }
 
-        void ImportSavedView()
+        void ImportSavedView(GameState_t& gameState)
         {
-            auto& gameState = GetGameState();
             gameState.SavedView = ScreenCoordsXY{ _s4.ViewX, _s4.ViewY };
             gameState.SavedViewZoom = ZoomLevel{ static_cast<int8_t>(_s4.ViewZoom) };
             gameState.SavedViewRotation = _s4.ViewRotation;
@@ -2441,9 +2435,8 @@ namespace OpenRCT2::RCT1
             dst->position.y = src->y;
         }
 
-        void FixEntrancePositions()
+        void FixEntrancePositions(GameState_t& gameState)
         {
-            auto& gameState = GetGameState();
             gameState.Park.Entrances.clear();
             TileElementIterator it;
             TileElementIteratorBegin(&it);
@@ -2513,143 +2506,6 @@ namespace OpenRCT2::RCT1
             auto asUtf8 = RCT2StringToUTF8(originalStringView, RCT2LanguageId::EnglishUK);
             auto justText = RCT12RemoveFormattingUTF8(asUtf8);
             return justText.data();
-        }
-
-        void FixLandOwnership()
-        {
-            switch (_s4.ScenarioSlotIndex)
-            {
-                case SC_DYNAMITE_DUNES:
-                    FixLandOwnershipTiles({ { 97, 18 }, { 99, 19 }, { 83, 34 } });
-                    break;
-                case SC_LEAFY_LAKE:
-                    FixLandOwnershipTiles({ { 49, 66 }, { 74, 96 } });
-                    break;
-                case SC_TRINITY_ISLANDS:
-                    FixLandOwnershipTilesWithOwnership({ { 80, 60 } }, OWNERSHIP_CONSTRUCTION_RIGHTS_OWNED);
-                    break;
-                case SC_KATIES_DREAMLAND:
-                    FixLandOwnershipTiles({ { 74, 70 }, { 75, 70 }, { 76, 70 }, { 77, 73 }, { 80, 77 } });
-                    FixLandOwnershipTilesWithOwnership(
-                        { { 115, 63 }, { 105, 66 }, { 109, 66 }, { 118, 67 } }, OWNERSHIP_CONSTRUCTION_RIGHTS_OWNED);
-                    FixLandOwnershipTilesWithOwnership({ { 45, 69 }, { 59, 74 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_POKEY_PARK:
-                    FixLandOwnershipTiles({ { 84, 71 }, { 64, 102 } });
-                    break;
-                case SC_WHITE_WATER_PARK:
-                    FixLandOwnershipTilesWithOwnership({ { 42, 85 }, { 89, 42 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_MELS_WORLD:
-                    FixLandOwnershipTilesWithOwnership({ { 93, 76 }, { 93, 77 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_MYSTIC_MOUNTAIN:
-                    FixLandOwnershipTiles({ { 98, 69 }, { 98, 70 }, { 103, 64 }, { 53, 79 }, { 86, 93 }, { 87, 93 } });
-                    break;
-                case SC_PACIFIC_PYRAMIDS:
-                    FixLandOwnershipTiles({ { 93, 105 }, { 63, 34 }, { 76, 25 }, { 85, 31 }, { 96, 47 }, { 96, 48 } });
-                    break;
-                case SC_THREE_MONKEYS_PARK:
-                    FixLandOwnershipTilesWithOwnership({ { 89, 92 } }, OWNERSHIP_UNOWNED);
-                    FixLandOwnershipTilesWithOwnership({ { 46, 22 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_HAUNTED_HARBOUR:
-                    FixLandOwnershipTiles({ { 49, 42 } });
-                    break;
-                case SC_COASTER_CANYON:
-                    FixLandOwnershipTilesWithOwnership({ { 21, 55 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_UTOPIA_PARK:
-                    FixLandOwnershipTiles({ { 85, 73 }, { 71, 75 }, { 90, 73 } });
-                    break;
-                case SC_ROTTING_HEIGHTS:
-                    FixLandOwnershipTilesWithOwnership({ { 35, 20 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_URBAN_PARK:
-                    FixLandOwnershipTiles({ { 64, 77 }, { 61, 66 }, { 61, 67 }, { 39, 20 } });
-                    FixLandOwnershipTilesWithOwnership({ { 46, 47 } }, OWNERSHIP_CONSTRUCTION_RIGHTS_AVAILABLE);
-                    break;
-                case SC_GRAND_GLACIER:
-                    FixLandOwnershipTilesWithOwnership({ { 99, 58 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_WOODWORM_PARK:
-                    FixLandOwnershipTilesWithOwnership({ { 62, 105 }, { 101, 55 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_PLEASURE_ISLAND:
-                    FixLandOwnershipTilesWithOwnership({ { 37, 66 } }, OWNERSHIP_CONSTRUCTION_RIGHTS_OWNED);
-                    break;
-                case SC_NEVERMORE_PARK:
-                    FixLandOwnershipTilesWithOwnership({ { 9, 74 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_ALTON_TOWERS:
-                    FixLandOwnershipTilesWithOwnership({ { 11, 31 }, { 68, 112 }, { 72, 118 } }, OWNERSHIP_OWNED);
-                    break;
-                case SC_BLACKPOOL_PLEASURE_BEACH:
-                    FixLandOwnershipTilesWithOwnership(
-                        { { 93, 23 },
-                          { 94, 23 },
-                          { 95, 23 },
-                          { 95, 24 },
-                          { 96, 24 },
-                          { 96, 25 },
-                          { 97, 25 },
-                          { 97, 26 },
-                          { 97, 27 },
-                          { 96, 28 } },
-                        OWNERSHIP_OWNED);
-                    FixLandOwnershipTilesWithOwnership({ { 94, 24 }, { 95, 25 } }, OWNERSHIP_CONSTRUCTION_RIGHTS_OWNED);
-                    break;
-                case SC_FORT_ANACHRONISM:
-                    FixLandOwnershipTiles({ { 36, 87 }, { 54, 29 }, { 53, 88 } });
-                    break;
-            }
-        }
-
-        /**
-         * In Urban Park, the entrance and exit of the merry-go-round are the wrong way round. This code fixes that.
-         * To avoid messing up saves (in which this problem is most likely solved by the user), only carry out this
-         * fix when loading from a scenario.
-         */
-        void FixUrbanPark()
-        {
-            if (_s4.ScenarioSlotIndex == SC_URBAN_PARK && _isScenario)
-            {
-                const auto merryGoRoundId = RideId::FromUnderlying(0);
-
-                // First, make the queuing peep exit
-                for (auto peep : EntityList<Guest>())
-                {
-                    if (peep->State == PeepState::QueuingFront && peep->CurrentRide == merryGoRoundId)
-                    {
-                        peep->RemoveFromQueue();
-                        peep->SetState(PeepState::Falling);
-                        break;
-                    }
-                }
-
-                // Now, swap the entrance and exit.
-                auto ride = GetRide(merryGoRoundId);
-                if (ride != nullptr)
-                {
-                    auto& station = ride->GetStation();
-                    auto entranceCoords = station.Exit;
-                    auto exitCoords = station.Entrance;
-                    station.Entrance = entranceCoords;
-                    station.Exit = exitCoords;
-
-                    auto entranceElement = MapGetRideExitElementAt(entranceCoords.ToCoordsXYZD(), false);
-                    entranceElement->SetEntranceType(ENTRANCE_TYPE_RIDE_ENTRANCE);
-                    auto exitElement = MapGetRideEntranceElementAt(exitCoords.ToCoordsXYZD(), false);
-                    exitElement->SetEntranceType(ENTRANCE_TYPE_RIDE_EXIT);
-
-                    // Trigger footpath update
-                    FootpathQueueChainReset();
-                    FootpathConnectEdges(
-                        entranceCoords.ToCoordsXY(), reinterpret_cast<TileElement*>(entranceElement),
-                        GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED);
-                    FootpathUpdateQueueChains();
-                }
-            }
         }
 
         void FixNextGuestNumber(GameState_t& gameState)

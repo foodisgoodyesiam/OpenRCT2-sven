@@ -16,6 +16,7 @@
 #include "../../../world/Map.h"
 #include "../../Paint.h"
 #include "../../support/WoodenSupports.h"
+#include "../../support/WoodenSupports.hpp"
 #include "../../tile_element/Paint.TileElement.h"
 #include "../../tile_element/Segment.h"
 #include "../../track/Segment.h"
@@ -23,7 +24,7 @@
 
 using namespace OpenRCT2;
 
-static constexpr WoodenSupportType kSupportType = WoodenSupportType::Truss;
+static constexpr TunnelGroup kTunnelGroup = TunnelGroup::Square;
 
 constexpr int32_t SPR_SIDE_FRICTION_60_DEG_UP_DIR_0_B = 21658;
 constexpr int32_t SPR_SIDE_FRICTION_60_DEG_UP_DIR_1_A = 21647;
@@ -75,7 +76,7 @@ constexpr int32_t SPR_SIDE_FRICTION_DIAG_60_DEG_UP_TO_25_DEG_UP_DIR_3_A = 21879;
 /** rct2: 0x0077839C */
 static void SideFrictionRCTrackFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     if (trackElement.HasChain())
     {
@@ -88,7 +89,6 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21664), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -97,7 +97,6 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21665), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -106,7 +105,6 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21668), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -115,7 +113,6 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21669), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                 break;
         }
     }
@@ -131,7 +128,6 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21608), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                 break;
             case 1:
             case 3:
@@ -141,11 +137,12 @@ static void SideFrictionRCTrackFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21609), { 0, 0, height },
                     { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                 break;
         }
     }
-    PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+    DrawSupportForSequenceA<TrackElemType::Flat>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
+    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
 }
@@ -153,7 +150,7 @@ static void SideFrictionRCTrackFlat(
 /** rct2: 0x007784AC, 0x007784BC, 0x007784CC */
 static void SideFrictionRCTrackStation(
     PaintSession& session, const Ride& ride, [[maybe_unused]] uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     static constexpr uint32_t imageIds[4] = {
         21610,
@@ -165,10 +162,10 @@ static void SideFrictionRCTrackStation(
     PaintAddImageAsParentRotated(
         session, direction, session.TrackColours.WithIndex(imageIds[direction]), { 0, 0, height },
         { { 0, 2, height }, { 32, 27, 2 } });
-    WoodenASupportsPaintSetupRotated(
-        session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours);
+    DrawSupportForSequenceA<TrackElemType::EndStation>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
     TrackPaintUtilDrawStation2(session, ride, direction, height, trackElement, 9, 11);
-    PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+    TrackPaintUtilDrawStationTunnel(session, direction, height);
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
 }
@@ -176,7 +173,7 @@ static void SideFrictionRCTrackStation(
 /** rct2: 0x007783AC */
 static void SideFrictionRCTrack25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     if (trackElement.HasChain())
     {
@@ -189,9 +186,6 @@ static void SideFrictionRCTrack25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21690), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -199,10 +193,7 @@ static void SideFrictionRCTrack25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21691), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 20 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -210,10 +201,7 @@ static void SideFrictionRCTrack25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21692), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 20 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -222,9 +210,6 @@ static void SideFrictionRCTrack25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21693), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
                 break;
         }
     }
@@ -239,9 +224,6 @@ static void SideFrictionRCTrack25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21634), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -249,10 +231,7 @@ static void SideFrictionRCTrack25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21635), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 20 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -260,10 +239,7 @@ static void SideFrictionRCTrack25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21636), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 20 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -272,19 +248,18 @@ static void SideFrictionRCTrack25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21637), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25Deg);
                 break;
         }
     }
+    DrawSupportForSequenceA<TrackElemType::Up25>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height - 8, TunnelType::SquareSlopeStart);
+        PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height + 8, TunnelType::SquareSlopeEnd);
+        PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::SlopeEnd);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + 56);
@@ -293,7 +268,7 @@ static void SideFrictionRCTrack25DegUp(
 /** rct2: 0x007783CC */
 static void SideFrictionRCTrackFlatTo25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     if (trackElement.HasChain())
     {
@@ -306,9 +281,6 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21682), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -316,10 +288,7 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21683), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -327,10 +296,7 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21684), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -339,9 +305,6 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21685), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
                 break;
         }
     }
@@ -356,9 +319,6 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21626), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -366,10 +326,7 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21627), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -377,10 +334,7 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21628), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -389,19 +343,18 @@ static void SideFrictionRCTrackFlatTo25DegUp(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21629), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::FlatToUp25Deg);
                 break;
         }
     }
+    DrawSupportForSequenceA<TrackElemType::FlatToUp25>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareSlopeEnd);
+        PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::SlopeEnd);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + 48);
@@ -410,7 +363,7 @@ static void SideFrictionRCTrackFlatTo25DegUp(
 /** rct2: 0x007783FC */
 static void SideFrictionRCTrack25DegUpToFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     if (trackElement.HasChain())
     {
@@ -423,9 +376,6 @@ static void SideFrictionRCTrack25DegUpToFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21686), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -433,10 +383,7 @@ static void SideFrictionRCTrack25DegUpToFlat(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21687), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -444,10 +391,7 @@ static void SideFrictionRCTrack25DegUpToFlat(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21688), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -456,9 +400,6 @@ static void SideFrictionRCTrack25DegUpToFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21689), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
                 break;
         }
     }
@@ -473,9 +414,6 @@ static void SideFrictionRCTrack25DegUpToFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21630), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
                 break;
             case 1:
                 PaintAddImageAsParentRotated(
@@ -483,10 +421,7 @@ static void SideFrictionRCTrack25DegUpToFlat(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21631), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 2:
                 PaintAddImageAsParentRotated(
@@ -494,10 +429,7 @@ static void SideFrictionRCTrack25DegUpToFlat(
                     { { 0, 2, height }, { 32, 27, 2 } });
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21632), { 0, 0, height },
-                    { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
+                    { { 0, 26, height + 5 }, { 32, 1, 16 } });
                 break;
             case 3:
                 PaintAddImageAsParentRotated(
@@ -506,19 +438,18 @@ static void SideFrictionRCTrack25DegUpToFlat(
                 PaintAddImageAsParentRotated(
                     session, direction, session.TrackColours.WithIndex(21633), { 0, 0, height },
                     { { 0, 26, height + 5 }, { 32, 1, 9 } });
-                WoodenASupportsPaintSetupRotated(
-                    session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                    WoodenSupportTransitionType::Up25DegToFlat);
                 break;
         }
     }
+    DrawSupportForSequenceA<TrackElemType::Up25ToFlat>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height - 8, TunnelType::SquareFlat);
+        PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::Flat);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height + 8, TunnelType::SquareFlatTo25Deg);
+        PaintUtilPushTunnelRotated(session, direction, height + 8, kTunnelGroup, TunnelSubType::FlatTo25Deg);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + 40);
@@ -527,31 +458,31 @@ static void SideFrictionRCTrack25DegUpToFlat(
 /** rct2: 0x0077840C */
 static void SideFrictionRCTrack25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrack25DegUp(session, ride, trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrack25DegUp(session, ride, trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077842C */
 static void SideFrictionRCTrackFlatTo25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrack25DegUpToFlat(session, ride, trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrack25DegUpToFlat(session, ride, trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077845C */
 static void SideFrictionRCTrack25DegDownToFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrackFlatTo25DegUp(session, ride, trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrackFlatTo25DegUp(session, ride, trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077846C */
 static void SideFrictionRCTrackLeftQuarterTurn5(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -564,8 +495,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21747), { 0, 2, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -573,8 +502,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21752), { 0, 2, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -582,8 +509,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21757), { 0, 2, height },
                         { { 0, 2, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -591,13 +516,13 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21742), { 0, 2, height },
                         { { 0, 2, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn5Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -620,8 +545,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21746), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -629,8 +552,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21751), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -638,8 +559,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21756), { 0, 16, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -647,10 +566,10 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21741), { 0, 16, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn5Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -670,8 +589,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21745), { 0, 16, height },
                         { { 0, 16, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -679,8 +596,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21750), { 16, 16, height },
                         { { 16, 16, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -688,8 +603,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21755), { 16, 0, height },
                         { { 16, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -697,10 +610,10 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21740), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn5Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -730,8 +643,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21744), { 16, 0, height },
                         { { 16, 0, height + 27 }, { 16, 34, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -739,8 +650,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21749), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 16, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -748,8 +657,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21754), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 16, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -757,10 +664,10 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21739), { 16, 0, height },
                         { { 16, 0, height + 27 }, { 16, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn5Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -780,8 +687,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21743), { 2, 0, height },
                         { { 2, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -789,8 +694,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21748), { 2, 0, height },
                         { { 2, 0, height + 27 }, { 27, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -798,8 +701,6 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21753), { 2, 0, height },
                         { { 2, 0, height + 27 }, { 27, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -807,17 +708,17 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21738), { 2, 0, height },
                         { { 2, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn5Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             switch (direction)
             {
                 case 2:
-                    PaintUtilPushTunnelRight(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
                 case 3:
-                    PaintUtilPushTunnelLeft(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
@@ -829,16 +730,16 @@ static void SideFrictionRCTrackLeftQuarterTurn5(
 /** rct2: 0x0077847C */
 static void SideFrictionRCTrackRightQuarterTurn5(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     trackSequence = kMapLeftQuarterTurn5TilesToRightQuarterTurn5Tiles[trackSequence];
-    SideFrictionRCTrackLeftQuarterTurn5(session, ride, trackSequence, (direction - 1) & 3, height, trackElement);
+    SideFrictionRCTrackLeftQuarterTurn5(session, ride, trackSequence, (direction - 1) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077848C */
 static void SideFrictionRCTrackSBendLeft(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -852,8 +753,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21904), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -862,8 +761,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21908), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -872,8 +769,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21907), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -882,13 +777,13 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21911), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendLeft>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -903,8 +798,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21905), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -913,8 +806,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21909), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -923,8 +814,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21906), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -933,10 +822,10 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21910), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendLeft>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -957,8 +846,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21906), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -967,8 +854,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21910), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -977,8 +862,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21905), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -987,10 +870,10 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21909), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendLeft>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -1011,8 +894,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21907), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1021,8 +902,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21911), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1031,8 +910,6 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21904), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1041,17 +918,17 @@ static void SideFrictionRCTrackSBendLeft(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21908), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendLeft>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             switch (direction)
             {
                 case 1:
-                    PaintUtilPushTunnelRight(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
                 case 2:
-                    PaintUtilPushTunnelLeft(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
@@ -1063,7 +940,7 @@ static void SideFrictionRCTrackSBendLeft(
 /** rct2: 0x0077849C */
 static void SideFrictionRCTrackSBendRight(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -1077,8 +954,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21912), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1087,8 +962,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21916), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1097,8 +970,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21915), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1107,13 +978,13 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21919), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendRight>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1128,8 +999,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21913), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1138,8 +1007,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21917), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1148,8 +1015,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21914), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1158,10 +1023,10 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21918), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendRight>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -1182,8 +1047,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21914), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1192,8 +1055,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21918), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1202,8 +1063,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21913), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1212,10 +1071,10 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21917), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 26, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendRight>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(
                 session,
                 PaintUtilRotateSegments(
@@ -1236,8 +1095,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21915), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1246,8 +1103,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21919), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1256,8 +1111,6 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21912), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1266,17 +1119,17 @@ static void SideFrictionRCTrackSBendRight(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21916), { 0, 0, height },
                         { { 0, 2, height + 27 }, { 32, 27, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::SBendRight>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             switch (direction)
             {
                 case 1:
-                    PaintUtilPushTunnelRight(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
                 case 2:
-                    PaintUtilPushTunnelLeft(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
@@ -1288,7 +1141,7 @@ static void SideFrictionRCTrackSBendRight(
 /** rct2: 0x007784DC */
 static void SideFrictionRCTrackLeftQuarterTurn3(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -1302,8 +1155,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21711), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 20, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1312,8 +1163,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21714), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 20, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1322,8 +1171,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21717), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 20, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1332,13 +1179,13 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21708), { 0, 0, height },
                         { { 0, 6, height + 27 }, { 32, 20, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn3Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1402,8 +1249,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21709), { 0, 0, height },
                         { { 6, 0, height + 27 }, { 20, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1412,8 +1257,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21712), { 0, 0, height },
                         { { 6, 0, height + 27 }, { 20, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1422,8 +1265,6 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21715), { 0, 0, height },
                         { { 6, 0, height + 27 }, { 20, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1432,17 +1273,17 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21706), { 0, 0, height },
                         { { 6, 0, height + 27 }, { 20, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftQuarterTurn3Tiles>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             switch (direction)
             {
                 case 2:
-                    PaintUtilPushTunnelRight(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelRight(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
                 case 3:
-                    PaintUtilPushTunnelLeft(session, height, TunnelType::SquareFlat);
+                    PaintUtilPushTunnelLeft(session, height, kTunnelGroup, TunnelSubType::Flat);
                     break;
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
@@ -1454,16 +1295,16 @@ static void SideFrictionRCTrackLeftQuarterTurn3(
 /** rct2: 0x007784EC */
 static void SideFrictionRCTrackRightQuarterTurn3(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     trackSequence = kMapLeftQuarterTurn3TilesToRightQuarterTurn3Tiles[trackSequence];
-    SideFrictionRCTrackLeftQuarterTurn3(session, ride, trackSequence, (direction - 1) & 3, height, trackElement);
+    SideFrictionRCTrackLeftQuarterTurn3(session, ride, trackSequence, (direction - 1) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x007784FC */
 static void SideFrictionRCTrackBrakes(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (direction)
     {
@@ -1475,7 +1316,6 @@ static void SideFrictionRCTrackBrakes(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(21612), { 0, 0, height },
                 { { 0, 2, height + 27 }, { 32, 27, 0 } });
-            WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
             break;
         case 1:
         case 3:
@@ -1485,10 +1325,11 @@ static void SideFrictionRCTrackBrakes(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(21613), { 0, 0, height },
                 { { 0, 2, height + 27 }, { 32, 27, 0 } });
-            WoodenASupportsPaintSetup(session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
             break;
     }
-    PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+    DrawSupportForSequenceA<TrackElemType::Brakes>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
+    PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
 }
@@ -1496,7 +1337,7 @@ static void SideFrictionRCTrackBrakes(
 /** rct2: 0x007785DC */
 static void SideFrictionRCTrackLeftEighthToDiag(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -1510,8 +1351,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21806), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1520,8 +1359,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21810), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1530,8 +1367,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21814), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1540,13 +1375,13 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21818), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1561,8 +1396,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21807), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1571,8 +1404,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21811), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1581,8 +1412,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21815), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1591,10 +1420,10 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21819), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
@@ -1608,8 +1437,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21808), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1618,8 +1445,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21812), { 0, 0, height },
                         { { 16, 16, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1628,8 +1453,6 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21816), { 0, 0, height },
                         { { 16, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1638,33 +1461,16 @@ static void SideFrictionRCTrackLeftEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21820), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::LeftEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 3:
-            switch (direction)
-            {
-                case 0:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                    break;
-                case 1:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                    break;
-                case 2:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                    break;
-                case 3:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                    break;
-            }
+            DrawSupportForSequenceA<TrackElemType::LeftEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
@@ -1713,7 +1519,7 @@ static void SideFrictionRCTrackLeftEighthToDiag(
 /** rct2: 0x007785EC */
 static void SideFrictionRCTrackRightEighthToDiag(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -1727,8 +1533,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21774), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1737,8 +1541,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21778), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1747,8 +1549,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21782), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1757,13 +1557,13 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21786), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 32, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::RightEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             if (direction == 0 || direction == 3)
             {
-                PaintUtilPushTunnelRotated(session, direction, height, TunnelType::SquareFlat);
+                PaintUtilPushTunnelRotated(session, direction, height, kTunnelGroup, TunnelSubType::Flat);
             }
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1778,8 +1578,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21775), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1788,8 +1586,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21779), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1798,8 +1594,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21783), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NeSw, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1808,10 +1602,10 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21787), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 32, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::NwSe, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::RightEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
@@ -1825,8 +1619,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21776), { 0, 0, height },
                         { { 0, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
                     break;
                 case 1:
                     PaintAddImageAsParentRotated(
@@ -1835,8 +1627,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21780), { 0, 0, height },
                         { { 16, 0, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                     break;
                 case 2:
                     PaintAddImageAsParentRotated(
@@ -1845,8 +1635,6 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21784), { 0, 0, height },
                         { { 4, 4, height + 27 }, { 28, 28, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
                     break;
                 case 3:
                     PaintAddImageAsParentRotated(
@@ -1855,33 +1643,16 @@ static void SideFrictionRCTrackRightEighthToDiag(
                     PaintAddImageAsParentRotated(
                         session, direction, session.TrackColours.WithIndex(21788), { 0, 0, height },
                         { { 0, 16, height + 27 }, { 16, 16, 0 } });
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                     break;
             }
+            DrawSupportForSequenceA<TrackElemType::RightEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 3:
-            switch (direction)
-            {
-                case 0:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                    break;
-                case 1:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                    break;
-                case 2:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                    break;
-                case 3:
-                    WoodenASupportsPaintSetup(
-                        session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                    break;
-            }
+            DrawSupportForSequenceA<TrackElemType::RightEighthToDiag>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
@@ -1930,25 +1701,25 @@ static void SideFrictionRCTrackRightEighthToDiag(
 /** rct2: 0x007785FC */
 static void SideFrictionRCTrackLeftEighthToOrthogonal(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     trackSequence = mapLeftEighthTurnToOrthogonal[trackSequence];
-    SideFrictionRCTrackRightEighthToDiag(session, ride, trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrackRightEighthToDiag(session, ride, trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077860C */
 static void SideFrictionRCTrackRightEighthToOrthogonal(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     trackSequence = mapLeftEighthTurnToOrthogonal[trackSequence];
-    SideFrictionRCTrackLeftEighthToDiag(session, ride, trackSequence, (direction + 3) & 3, height, trackElement);
+    SideFrictionRCTrackLeftEighthToDiag(session, ride, trackSequence, (direction + 3) & 3, height, trackElement, supportType);
 }
 
 /** rct2: 0x0077850C */
 static void SideFrictionRCTrackDiagFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     constexpr ImageIndex images[2][kNumOrthogonalDirections] = {
         { 21822, 21823, 21824, 21825 },
@@ -1972,9 +1743,6 @@ static void SideFrictionRCTrackDiagFlat(
                     session, direction, session.TrackColours.WithIndex(additionalImages[trackElement.HasChain()][direction]),
                     { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
             }
-
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height, session.SupportColours);
             break;
         case 2:
             if (direction == 2)
@@ -1983,11 +1751,10 @@ static void SideFrictionRCTrackDiagFlat(
                     session, direction, session.TrackColours.WithIndex(additionalImages[trackElement.HasChain()][direction]),
                     { -16, -16, height }, { { -16, -16, height + 27 }, { 32, 32, 0 } });
             }
-
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height, session.SupportColours);
             break;
     }
+    DrawSupportForSequenceA<TrackElemType::DiagFlat>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
 
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
@@ -1996,7 +1763,7 @@ static void SideFrictionRCTrackDiagFlat(
 /** rct2: 0x0077853C */
 static void SideFrictionRCTrackDiag25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2023,8 +1790,6 @@ static void SideFrictionRCTrackDiag25DegUp(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 1:
             if (trackElement.HasChain())
@@ -2055,12 +1820,6 @@ static void SideFrictionRCTrackDiag25DegUp(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 2:
             if (trackElement.HasChain())
@@ -2091,12 +1850,6 @@ static void SideFrictionRCTrackDiag25DegUp(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 3:
             if (trackElement.HasChain())
@@ -2121,16 +1874,19 @@ static void SideFrictionRCTrackDiag25DegUp(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagUp25>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 56);
 }
 
 /** rct2: 0x0077851C */
 static void SideFrictionRCTrackDiagFlatTo25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2172,20 +1928,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21856), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                        break;
-                    case 2:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                         break;
                 }
             }
@@ -2200,23 +1942,11 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21832), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                        break;
-                    case 2:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                         break;
                 }
             }
+            DrawSupportForSequenceA<TrackElemType::DiagFlatToUp25>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + 48);
             break;
@@ -2225,14 +1955,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
             {
                 switch (direction)
                 {
-                    case 0:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                        break;
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21854), { -16, -16, height },
@@ -2240,12 +1962,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21857), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                         break;
                 }
             }
@@ -2253,14 +1969,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
             {
                 switch (direction)
                 {
-                    case 0:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                        break;
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21830), { -16, -16, height },
@@ -2268,15 +1976,11 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21833), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                         break;
                 }
             }
+            DrawSupportForSequenceA<TrackElemType::DiagFlatToUp25>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + 48);
             break;
@@ -2312,7 +2016,7 @@ static void SideFrictionRCTrackDiagFlatTo25DegUp(
 /** rct2: 0x0077852C */
 static void SideFrictionRCTrackDiag25DegUpToFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2339,8 +2043,6 @@ static void SideFrictionRCTrackDiag25DegUpToFlat(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 1:
             if (trackElement.HasChain())
@@ -2371,12 +2073,6 @@ static void SideFrictionRCTrackDiag25DegUpToFlat(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 2:
             if (trackElement.HasChain())
@@ -2407,12 +2103,6 @@ static void SideFrictionRCTrackDiag25DegUpToFlat(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 3:
             if (trackElement.HasChain())
@@ -2437,16 +2127,19 @@ static void SideFrictionRCTrackDiag25DegUpToFlat(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
+
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagUp25ToFlat>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 56);
 }
 
 /** rct2: 0x0077859C */
 static void SideFrictionRCTrackDiag25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2473,8 +2166,6 @@ static void SideFrictionRCTrackDiag25DegDown(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 1:
             if (trackElement.HasChain())
@@ -2505,12 +2196,6 @@ static void SideFrictionRCTrackDiag25DegDown(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 2:
             if (trackElement.HasChain())
@@ -2541,12 +2226,6 @@ static void SideFrictionRCTrackDiag25DegDown(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
             break;
         case 3:
             if (trackElement.HasChain())
@@ -2571,16 +2250,19 @@ static void SideFrictionRCTrackDiag25DegDown(
                         break;
                 }
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 56);
+
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagDown25>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 56);
 }
 
 /** rct2: 0x0077857C */
 static void SideFrictionRCTrackDiagFlatTo25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2637,10 +2319,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegDown(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
             break;
         case 2:
             if (trackElement.HasChain())
@@ -2671,10 +2349,6 @@ static void SideFrictionRCTrackDiagFlatTo25DegDown(
                         break;
                 }
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
             break;
         case 3:
             if (trackElement.HasChain())
@@ -2702,6 +2376,8 @@ static void SideFrictionRCTrackDiagFlatTo25DegDown(
             break;
     }
 
+    DrawSupportForSequenceB<TrackElemType::DiagFlatToDown25>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + 56);
 }
@@ -2709,7 +2385,7 @@ static void SideFrictionRCTrackDiagFlatTo25DegDown(
 /** rct2: 0x0077858C */
 static void SideFrictionRCTrackDiag25DegDownToFlat(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -2751,20 +2427,6 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21857), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                        break;
-                    case 2:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                         break;
                 }
             }
@@ -2779,23 +2441,11 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21833), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
-                        break;
-                    case 2:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
                         break;
                 }
             }
+            DrawSupportForSequenceA<TrackElemType::DiagDown25ToFlat>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + 48);
             break;
@@ -2804,14 +2454,6 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
             {
                 switch (direction)
                 {
-                    case 0:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                        break;
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21852), { -16, -16, height },
@@ -2819,12 +2461,6 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21856), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                         break;
                 }
             }
@@ -2832,14 +2468,6 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
             {
                 switch (direction)
                 {
-                    case 0:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner2, height, session.SupportColours);
-                        break;
-                    case 1:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner3, height, session.SupportColours);
-                        break;
                     case 2:
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21828), { -16, -16, height },
@@ -2847,15 +2475,11 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
                         PaintAddImageAsParentRotated(
                             session, direction, session.TrackColours.WithIndex(21832), { -16, -16, height },
                             { { -16, -16, height + 35 }, { 32, 32, 0 } });
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner0, height, session.SupportColours);
-                        break;
-                    case 3:
-                        WoodenASupportsPaintSetup(
-                            session, kSupportType, WoodenSupportSubType::Corner1, height, session.SupportColours);
                         break;
                 }
             }
+            DrawSupportForSequenceA<TrackElemType::DiagDown25ToFlat>(
+                session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
             PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
             PaintUtilSetGeneralSupportHeight(session, height + 48);
             break;
@@ -2890,7 +2514,7 @@ static void SideFrictionRCTrackDiag25DegDownToFlat(
 
 static void SideFrictionRCTrack60DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (direction)
     {
@@ -2901,9 +2525,6 @@ static void SideFrictionRCTrack60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_DIR_0_B), { 0, 0, height },
                 { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60Deg);
             break;
         case 1:
             PaintAddImageAsParentRotated(
@@ -2913,10 +2534,6 @@ static void SideFrictionRCTrack60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_DIR_1_B), { 0, 0, height },
                 { { 0, 26, height + 5 }, { 32, 1, 9 } });
-
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60Deg);
             break;
         case 2:
             PaintAddImageAsParentRotated(
@@ -2925,10 +2542,6 @@ static void SideFrictionRCTrack60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_DIR_2_B), { 0, 0, height },
                 { { 0, 26, height + 5 }, { 32, 1, 9 } });
-
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60Deg);
             break;
         case 3:
             PaintAddImageAsParentRotated(
@@ -2937,19 +2550,18 @@ static void SideFrictionRCTrack60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_DIR_3_B), { 0, 0, height },
                 { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60Deg);
             break;
     }
+    DrawSupportForSequenceA<TrackElemType::Up60>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
 
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height - 8, TunnelType::SquareSlopeStart);
+        PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height + 8, TunnelType::SquareSlopeEnd);
+        PaintUtilPushTunnelRotated(session, direction, height + 56, kTunnelGroup, TunnelSubType::SlopeEnd);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
     PaintUtilSetGeneralSupportHeight(session, height + 104);
@@ -2957,14 +2569,14 @@ static void SideFrictionRCTrack60DegUp(
 
 static void SideFrictionRCTrack60DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrack60DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement);
+    SideFrictionRCTrack60DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement, supportType);
 }
 
 static void SideFrictionRCTrack25DegUpTo60DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (direction)
     {
@@ -2975,9 +2587,6 @@ static void SideFrictionRCTrack25DegUpTo60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_25_DEG_UP_TO_60_DEG_UP_DIR_0_B),
                 { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up25DegToUp60Deg);
             break;
         case 1:
             PaintAddImageAsParentRotated(
@@ -2985,10 +2594,7 @@ static void SideFrictionRCTrack25DegUpTo60DegUp(
                 { 0, 0, height }, { { 0, 2, height }, { 32, 27, 2 } });
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_25_DEG_UP_TO_60_DEG_UP_DIR_1_B),
-                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up25DegToUp60Deg);
+                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 40 } });
             break;
         case 2:
             PaintAddImageAsParentRotated(
@@ -2996,10 +2602,7 @@ static void SideFrictionRCTrack25DegUpTo60DegUp(
                 { 0, 0, height }, { { 0, 2, height }, { 32, 27, 2 } });
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_25_DEG_UP_TO_60_DEG_UP_DIR_2_B),
-                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up25DegToUp60Deg);
+                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 40 } });
             break;
         case 3:
             PaintAddImageAsParentRotated(
@@ -3008,34 +2611,33 @@ static void SideFrictionRCTrack25DegUpTo60DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_25_DEG_UP_TO_60_DEG_UP_DIR_3_B),
                 { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up25DegToUp60Deg);
             break;
     }
+    DrawSupportForSequenceA<TrackElemType::Up25ToUp60>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
 
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height - 8, TunnelType::SquareSlopeStart);
+        PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height + 8, TunnelType::SquareSlopeEnd);
+        PaintUtilPushTunnelRotated(session, direction, height + 24, kTunnelGroup, TunnelSubType::SlopeEnd);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-    PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
+    PaintUtilSetGeneralSupportHeight(session, height + 72);
 }
 
 static void SideFrictionRCTrack60DegDownTo25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrack25DegUpTo60DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement);
+    SideFrictionRCTrack25DegUpTo60DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement, supportType);
 }
 
 static void SideFrictionRCTrack60DegUpTo25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (direction)
     {
@@ -3046,9 +2648,6 @@ static void SideFrictionRCTrack60DegUpTo25DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_TO_25_DEG_UP_DIR_0_B),
                 { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60DegToUp25Deg);
             break;
         case 1:
             PaintAddImageAsParentRotated(
@@ -3056,10 +2655,7 @@ static void SideFrictionRCTrack60DegUpTo25DegUp(
                 { 0, 0, height }, { { 0, 2, height }, { 32, 27, 2 } });
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_TO_25_DEG_UP_DIR_1_B),
-                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60DegToUp25Deg);
+                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 36 } });
             break;
         case 2:
             PaintAddImageAsParentRotated(
@@ -3067,10 +2663,7 @@ static void SideFrictionRCTrack60DegUpTo25DegUp(
                 { 0, 0, height }, { { 0, 2, height }, { 32, 27, 2 } });
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_TO_25_DEG_UP_DIR_2_B),
-                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60DegToUp25Deg);
+                { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 36 } });
             break;
         case 3:
             PaintAddImageAsParentRotated(
@@ -3079,34 +2672,33 @@ static void SideFrictionRCTrack60DegUpTo25DegUp(
             PaintAddImageAsParentRotated(
                 session, direction, session.TrackColours.WithIndex(SPR_SIDE_FRICTION_60_DEG_UP_TO_25_DEG_UP_DIR_3_B),
                 { 0, 0, height }, { { 0, 26, height + 5 }, { 32, 1, 9 } });
-            WoodenASupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::NeSw, direction, height, session.SupportColours,
-                WoodenSupportTransitionType::Up60DegToUp25Deg);
             break;
     }
+    DrawSupportForSequenceA<TrackElemType::Up60ToUp25>(
+        session, supportType.wooden, trackSequence, direction, height, session.SupportColours);
 
     if (direction == 0 || direction == 3)
     {
-        PaintUtilPushTunnelRotated(session, direction, height - 8, TunnelType::SquareSlopeStart);
+        PaintUtilPushTunnelRotated(session, direction, height - 8, kTunnelGroup, TunnelSubType::SlopeStart);
     }
     else
     {
-        PaintUtilPushTunnelRotated(session, direction, height + 8, TunnelType::SquareSlopeEnd);
+        PaintUtilPushTunnelRotated(session, direction, height + 24, kTunnelGroup, TunnelSubType::SlopeEnd);
     }
     PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-    PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
+    PaintUtilSetGeneralSupportHeight(session, height + 72);
 }
 
 static void SideFrictionRCTrack25DegDownTo60DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrack60DegUpTo25DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement);
+    SideFrictionRCTrack60DegUpTo25DegUp(session, ride, trackSequence, (direction + 2) % 4, height, trackElement, supportType);
 }
 
 static void SideFrictionRCTrackDiag60DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -3119,8 +2711,6 @@ static void SideFrictionRCTrackDiag60DegUp(
                         { -16, -16, height }, { { -16, -16, height }, { 32, 32, 2 } });
                     break;
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 104);
             break;
         case 1:
             switch (direction)
@@ -3134,12 +2724,6 @@ static void SideFrictionRCTrackDiag60DegUp(
                         { -16, -16, height }, { { -16, -16, height + 43 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 104);
             break;
         case 2:
             switch (direction)
@@ -3153,12 +2737,6 @@ static void SideFrictionRCTrackDiag60DegUp(
                         { -16, -16, height }, { { -16, -16, height + 43 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 104);
             break;
         case 3:
             switch (direction)
@@ -3170,22 +2748,24 @@ static void SideFrictionRCTrackDiag60DegUp(
                     break;
             }
 
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + 104);
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagUp60>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 104);
 }
 
 static void SideFrictionRCTrackDiag60DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrackDiag60DegUp(session, ride, 3 - trackSequence, (direction + 2) % 4, height, trackElement);
+    SideFrictionRCTrackDiag60DegUp(session, ride, 3 - trackSequence, (direction + 2) % 4, height, trackElement, supportType);
 }
 
 static void SideFrictionRCTrackDiag60DegUpTo25DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -3199,8 +2779,6 @@ static void SideFrictionRCTrackDiag60DegUpTo25DegUp(
                         { -16, -16, height }, { { -16, -16, height }, { 32, 32, 2 } });
                     break;
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 1:
             switch (direction)
@@ -3216,12 +2794,6 @@ static void SideFrictionRCTrackDiag60DegUpTo25DegUp(
                         { -16, -16, height }, { { -16, -16, height + 59 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 2:
             switch (direction)
@@ -3237,12 +2809,6 @@ static void SideFrictionRCTrackDiag60DegUpTo25DegUp(
                         { -16, -16, height }, { { -16, -16, height + 59 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 3:
             switch (direction)
@@ -3254,22 +2820,26 @@ static void SideFrictionRCTrackDiag60DegUpTo25DegUp(
                         { -16, -16, height }, { { 0, 0, height }, { 16, 16, 2 } });
                     break;
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
+
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagUp60ToUp25>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 72);
 }
 
 static void SideFrictionRCTrackDiag25DegDownTo60DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrackDiag60DegUpTo25DegUp(session, ride, 3 - trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrackDiag60DegUpTo25DegUp(
+        session, ride, 3 - trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 };
 
 static void SideFrictionRCTrackDiag25DegUpTo60DegUp(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
     switch (trackSequence)
     {
@@ -3283,8 +2853,6 @@ static void SideFrictionRCTrackDiag25DegUpTo60DegUp(
                         { -16 + 4, -16 + 2, height }, { { -16, -16, height }, { 32, 32, 2 } });
                     break;
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 1:
             switch (direction)
@@ -3299,12 +2867,6 @@ static void SideFrictionRCTrackDiag25DegUpTo60DegUp(
                         { { -16, -16, height + 59 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner0, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 2:
             switch (direction)
@@ -3319,12 +2881,6 @@ static void SideFrictionRCTrackDiag25DegUpTo60DegUp(
                         { { -16, -16, height + 59 }, { 32, 32, 0 } });
                     break;
             }
-
-            WoodenBSupportsPaintSetupRotated(
-                session, kSupportType, WoodenSupportSubType::Corner2, direction, height + 16, session.SupportColours);
-
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
             break;
         case 3:
             switch (direction)
@@ -3336,17 +2892,21 @@ static void SideFrictionRCTrackDiag25DegUpTo60DegUp(
                         { -16, -16, height }, { { -16, -16, height }, { 32, 32, 2 } });
                     break;
             }
-            PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
-            PaintUtilSetGeneralSupportHeight(session, height + kDefaultGeneralSupportHeight);
+
             break;
     }
+    DrawSupportForSequenceB<TrackElemType::DiagUp25ToUp60>(
+        session, supportType.wooden, trackSequence, direction, height + 16, session.SupportColours);
+    PaintUtilSetSegmentSupportHeight(session, kSegmentsAll, 0xFFFF, 0);
+    PaintUtilSetGeneralSupportHeight(session, height + 72);
 }
 
 static void SideFrictionRCTrackDiag60DegDownTo25DegDown(
     PaintSession& session, const Ride& ride, uint8_t trackSequence, uint8_t direction, int32_t height,
-    const TrackElement& trackElement)
+    const TrackElement& trackElement, SupportType supportType)
 {
-    SideFrictionRCTrackDiag25DegUpTo60DegUp(session, ride, 3 - trackSequence, (direction + 2) & 3, height, trackElement);
+    SideFrictionRCTrackDiag25DegUpTo60DegUp(
+        session, ride, 3 - trackSequence, (direction + 2) & 3, height, trackElement, supportType);
 };
 
 TRACK_PAINT_FUNCTION GetTrackPaintFunctionSideFrictionRC(int32_t trackType)

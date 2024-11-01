@@ -19,7 +19,6 @@
 #include "Game.h"
 #include "GameState.h"
 #include "GameStateSnapshots.h"
-#include "Input.h"
 #include "OpenRCT2.h"
 #include "ParkImporter.h"
 #include "PlatformEnvironment.h"
@@ -525,7 +524,6 @@ namespace OpenRCT2
                 LightFXInit();
             }
 
-            InputResetPlaceObjModifier();
             ViewportInitAll();
 
             ContextInit();
@@ -852,7 +850,7 @@ namespace OpenRCT2
                 }
                 // This ensures that the newly loaded save reflects the user's
                 // 'show real names of guests' option, now that it's a global setting
-                PeepUpdateNames(Config::Get().general.ShowRealNamesOfGuests);
+                PeepUpdateNames();
 #ifndef DISABLE_NETWORK
                 if (sendMap)
                 {

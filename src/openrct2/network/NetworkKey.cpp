@@ -14,6 +14,7 @@
 #    include "../Diagnostic.h"
 #    include "../core/Crypt.h"
 #    include "../core/IStream.hpp"
+#    include "../core/String.hpp"
 
 #    include <vector>
 
@@ -174,16 +175,7 @@ std::string NetworkKey::PublicKeyHash()
             throw std::runtime_error("No key found");
         }
         auto hash = Crypt::SHA1(key.c_str(), key.size());
-
-        std::string result;
-        result.reserve(hash.size() * 2);
-        for (auto b : hash)
-        {
-            char buf[3];
-            snprintf(buf, 3, "%02x", b);
-            result.append(buf);
-        }
-        return result;
+        return String::StringFromHex(hash);
     }
     catch (const std::exception& e)
     {

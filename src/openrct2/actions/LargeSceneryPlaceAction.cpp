@@ -21,6 +21,7 @@
 #include "../world/Banner.h"
 #include "../world/ConstructionClearance.h"
 #include "../world/MapAnimation.h"
+#include "../world/QuarterTile.h"
 #include "../world/Surface.h"
 #include "../world/tile_element/Slope.h"
 
@@ -70,6 +71,8 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
 
     auto resultData = LargeSceneryPlaceActionResult{};
 
+    auto& gameState = GetGameState();
+
     money64 supportsCost = 0;
 
     if (_primaryColour >= COLOUR_COUNT)
@@ -87,7 +90,7 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
         LOG_ERROR("Invalid tertiary colour %u", _tertiaryColour);
         return GameActions::Result(GameActions::Status::InvalidParameters, STR_CANT_POSITION_THIS_HERE, STR_ERR_INVALID_COLOUR);
     }
-    else if (_sceneryType >= MAX_LARGE_SCENERY_OBJECTS)
+    else if (_sceneryType >= kMaxLargeSceneryObjects)
     {
         LOG_ERROR("Invalid sceneryType %u", _sceneryType);
         return GameActions::Result(
@@ -147,7 +150,7 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
 
         const auto clearanceData = canBuild.GetData<ConstructClearResult>();
         int32_t tempSceneryGroundFlags = clearanceData.GroundFlags & (ELEMENT_IS_ABOVE_GROUND | ELEMENT_IS_UNDERGROUND);
-        if (!GetGameState().Cheats.DisableClearanceChecks)
+        if (!gameState.Cheats.DisableClearanceChecks)
         {
             if ((clearanceData.GroundFlags & ELEMENT_IS_UNDERWATER) || (clearanceData.GroundFlags & ELEMENT_IS_UNDERGROUND))
             {
@@ -170,7 +173,7 @@ GameActions::Result LargeSceneryPlaceAction::Query() const
         }
 
         if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !MapIsLocationOwned({ curTile, zLow })
-            && !GetGameState().Cheats.SandboxMode)
+            && !gameState.Cheats.SandboxMode)
         {
             return GameActions::Result(
                 GameActions::Status::Disallowed, STR_CANT_POSITION_THIS_HERE, STR_LAND_NOT_OWNED_BY_PARK);

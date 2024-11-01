@@ -11,7 +11,7 @@
 
 #include "../core/CallingConventions.h"
 #include "../core/Money.hpp"
-#include "../core/String.hpp"
+#include "../core/StringTypes.h"
 
 #include <cstdio>
 #include <ctime>
@@ -25,8 +25,15 @@
 
 int32_t SquaredMetresToSquaredFeet(int32_t squaredMetres) __attribute__ ((const));
 int32_t MetresToFeet(int32_t metres) __attribute__ ((const));
+int32_t FeetToMetres(int32_t feet) __attribute__ ((const));
 int32_t MphToKmph(int32_t mph) __attribute__ ((const));
 int32_t MphToDmps(int32_t mph) __attribute__ ((const));
+int32_t BaseZToMetres(int16_t baseZ) __attribute__ ((const));
+uint8_t MetresToBaseZ(int16_t metres) __attribute__ ((const));
+int32_t HeightUnitsToMetres(int32_t heightUnit) __attribute__ ((const));
+int32_t ToHumanReadableSpeed(int32_t baseSpeed) __attribute__ ((const));
+uint16_t ToHumanReadableAirTime(uint16_t airTime) __attribute__ ((const));
+int32_t ToHumanReadableRideLength(int32_t rideLength) __attribute__ ((const));
 
 inline int32_t UtilBitScanForward(uint32_t source)
 {
@@ -125,6 +132,12 @@ template<typename... T> [[nodiscard]] constexpr uint64_t EnumsToFlags(T... types
 template<typename TEnum> constexpr auto EnumValue(TEnum enumerator) noexcept
 {
     return static_cast<std::underlying_type_t<TEnum>>(enumerator);
+}
+
+template<typename T> constexpr bool HasFlag(uint64_t holder, T v)
+{
+    static_assert(std::is_enum_v<T>);
+    return (holder & EnumToFlag(v)) != 0;
 }
 
 constexpr uint8_t HiByte(uint16_t value)

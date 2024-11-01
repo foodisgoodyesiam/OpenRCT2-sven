@@ -36,6 +36,7 @@
 #include "ObjectLimits.h"
 #include "ObjectList.h"
 #include "PathAdditionObject.h"
+#include "PeepNamesObject.h"
 #include "RideObject.h"
 #include "SceneryGroupObject.h"
 #include "SmallSceneryObject.h"
@@ -272,7 +273,7 @@ namespace OpenRCT2::ObjectFactory
                 result = CreateObject(entry.GetType());
                 result->SetDescriptor(ObjectEntryDescriptor(entry));
 
-                utf8 objectName[DAT_NAME_LENGTH + 1] = { 0 };
+                utf8 objectName[kDatNameLength + 1] = { 0 };
                 ObjectEntryGetNameFixed(objectName, sizeof(objectName), &entry);
                 LOG_VERBOSE("  entry: { 0x%08X, \"%s\", 0x%08X }", entry.flags, objectName, entry.checksum);
 
@@ -307,7 +308,7 @@ namespace OpenRCT2::ObjectFactory
         {
             result->SetDescriptor(ObjectEntryDescriptor(*entry));
 
-            utf8 objectName[DAT_NAME_LENGTH + 1];
+            utf8 objectName[kDatNameLength + 1];
             ObjectEntryGetNameFixed(objectName, sizeof(objectName), entry);
 
             auto readContext = ReadObjectContext(objectRepository, objectName, !gOpenRCT2NoGraphics, nullptr);
@@ -384,6 +385,9 @@ namespace OpenRCT2::ObjectFactory
             case ObjectType::Audio:
                 result = std::make_unique<AudioObject>();
                 break;
+            case ObjectType::PeepNames:
+                result = std::make_unique<PeepNamesObject>();
+                break;
             default:
                 throw std::runtime_error("Invalid object type");
         }
@@ -424,6 +428,8 @@ namespace OpenRCT2::ObjectFactory
             return ObjectType::FootpathRailings;
         if (s == "audio")
             return ObjectType::Audio;
+        if (s == "peep_names")
+            return ObjectType::PeepNames;
         return ObjectType::None;
     }
 

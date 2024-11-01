@@ -18,6 +18,7 @@
 #include "../core/DataSerialiser.h"
 #include "../core/Guard.hpp"
 #include "../core/MemoryStream.h"
+#include "../core/String.hpp"
 #include "../entity/Peep.h"
 #include "../entity/Staff.h"
 #include "../interface/Viewport.h"
@@ -98,17 +99,7 @@ uint16_t GetNumFreeEntities()
 
 std::string EntitiesChecksum::ToString() const
 {
-    std::string result;
-
-    result.reserve(raw.size() * 2);
-    for (auto b : raw)
-    {
-        char buf[3];
-        snprintf(buf, 3, "%02x", static_cast<int32_t>(b));
-        result.append(buf);
-    }
-
-    return result;
+    return String::StringFromHex(raw);
 }
 
 EntityBase* TryGetEntity(EntityId entityIndex)

@@ -18,10 +18,12 @@
 #include "../openrct2/Cheats.h"
 #include "../ride/Ride.h"
 #include "../ride/RideData.h"
-#include "../world/tile_element/Slope.h"
 #include "Park.h"
+#include "QuarterTile.h"
 #include "Scenery.h"
 #include "Surface.h"
+#include "tile_element/EntranceElement.h"
+#include "tile_element/Slope.h"
 
 using namespace OpenRCT2;
 
@@ -102,7 +104,7 @@ static bool MapLoc68BABCShouldContinue(
         && tileElement->AsTrack()->GetTrackType() == TrackElemType::Flat)
     {
         auto ride = GetRide(tileElement->AsTrack()->GetRideIndex());
-        if (ride != nullptr && ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_SUPPORTS_LEVEL_CROSSINGS))
+        if (ride != nullptr && ride->GetRideTypeDescriptor().HasFlag(RtdFlag::supportsLevelCrossings))
         {
             return true;
         }

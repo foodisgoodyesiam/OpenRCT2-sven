@@ -434,7 +434,7 @@ bool WallPlaceAction::WallCheckObstructionWithTrack(
         return false;
     }
 
-    if (!ride->GetRideTypeDescriptor().HasFlag(RIDE_TYPE_FLAG_ALLOW_DOORS_ON_TRACK))
+    if (!ride->GetRideTypeDescriptor().HasFlag(RtdFlag::allowDoorsOnTrack))
     {
         return false;
     }
@@ -448,21 +448,20 @@ bool WallPlaceAction::WallCheckObstructionWithTrack(
     int32_t z;
     if (sequence == 0)
     {
-        if (std::get<0>(ted.SequenceProperties) & TRACK_SEQUENCE_FLAG_DISALLOW_DOORS)
+        if (ted.sequences[0].flags & TRACK_SEQUENCE_FLAG_DISALLOW_DOORS)
         {
             return false;
         }
 
-        if (ted.Definition.RollStart == TrackRoll::None)
+        if (ted.definition.rollStart == TrackRoll::None)
         {
-            if (!(ted.Coordinates.rotation_begin & 4))
+            if (!(ted.coordinates.rotationBegin & 4))
             {
                 direction = DirectionReverse(trackElement->GetDirection());
                 if (direction == _edge)
                 {
-                    const PreviewTrack* trackBlock = ted.GetBlockForSequence(sequence);
-                    z = ted.Coordinates.z_begin;
-                    z = trackElement->BaseHeight + ((z - trackBlock->z) * 8);
+                    z = ted.coordinates.zBegin;
+                    z = trackElement->BaseHeight + ((z - ted.sequences[sequence].clearance.z) * 8);
                     if (z == z0)
                     {
                         return true;
@@ -472,32 +471,31 @@ bool WallPlaceAction::WallCheckObstructionWithTrack(
         }
     }
 
-    const PreviewTrack* trackBlock = &ted.Block[sequence + 1];
-    if (trackBlock->index != 0xFF)
+    bool isLastInSequence = (sequence + 1) == ted.numSequences;
+    if (!isLastInSequence)
     {
         return false;
     }
 
-    if (ted.Definition.RollEnd != TrackRoll::None)
+    if (ted.definition.rollEnd != TrackRoll::None)
     {
         return false;
     }
 
-    direction = ted.Coordinates.rotation_end;
+    direction = ted.coordinates.rotationEnd;
     if (direction & 4)
     {
         return false;
     }
 
-    direction = (trackElement->GetDirection() + ted.Coordinates.rotation_end) & kTileElementDirectionMask;
+    direction = (trackElement->GetDirection() + ted.coordinates.rotationEnd) & kTileElementDirectionMask;
     if (direction != _edge)
     {
         return false;
     }
 
-    trackBlock = ted.GetBlockForSequence(sequence);
-    z = ted.Coordinates.z_end;
-    z = trackElement->BaseHeight + ((z - trackBlock->z) * 8);
+    z = ted.coordinates.zEnd;
+    z = trackElement->BaseHeight + ((z - ted.sequences[sequence].clearance.z) * kCoordsZStep);
     return z == z0;
 }
 
@@ -602,10 +600,10 @@ GameActions::Result WallPlaceAction::WallCheckObstruction(
 bool WallPlaceAction::TrackIsAllowedWallEdges(
     ride_type_t rideType, track_type_t trackType, uint8_t trackSequence, uint8_t direction)
 {
-    if (!GetRideTypeDescriptor(rideType).HasFlag(RIDE_TYPE_FLAG_TRACK_NO_WALLS))
+    if (!GetRideTypeDescriptor(rideType).HasFlag(RtdFlag::noWallsAroundTrack))
     {
         const auto& ted = GetTrackElementDescriptor(trackType);
-        if (ted.SequenceElementAllowedWallEdges[trackSequence] & (1 << direction))
+        if (ted.sequences[trackSequence].allowedWallEdges & (1 << direction))
         {
             return true;
         }
